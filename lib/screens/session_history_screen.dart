@@ -6,16 +6,39 @@ import '../providers/providers.dart';
 import '../widgets/session_tile.dart';
 import 'log_session_screen.dart';
 import 'session_detail_screen.dart';
+import 'import_export_screen.dart';
 
 class SessionHistoryScreen extends ConsumerWidget {
   const SessionHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(sessionsProvider);
+    final sessionsAsync = ref.watch(filteredSessionsProvider);
+    final filter = ref.watch(filterProvider);
+    final hasFilter = !filter.isEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sessions')),
+      appBar: AppBar(
+        title: const Text('Sessions'),
+        actions: [
+          IconButton(
+            icon: Badge(
+              isLabelVisible: hasFilter,
+              child: const Icon(Icons.filter_list),
+            ),
+            tooltip: 'Filter',
+            onPressed: () => _showFilterSheet(context, ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.import_export),
+            tooltip: 'Import / Export',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ImportExportScreen()),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_sessions',
         onPressed: () => Navigator.push(
@@ -30,10 +53,297 @@ class SessionHistoryScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (sessions) {
           if (sessions.isEmpty) {
-            return const Center(child: Text('No sessions yet.'));
+            return Center(
+              child: Text(
+                hasFilter
+                    ? 'No sessions match your filters.'
+                    : 'No sessions yet.',
+              ),
+            );
           }
           return _SessionList(sessions: sessions);
         },
+      ),
+    );
+  }
+
+  void _showFilterSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const _FilterSheet(),
+    );
+  }
+}
+
+class _FilterSheet extends ConsumerStatefulWidget {
+  const _FilterSheet();
+
+  @override
+  ConsumerState<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends ConsumerState<_FilterSheet> {
+  late SessionFilter _draft;
+
+  @override
+  void initState() {
+    super.initState();
+    _draft = ref.read(filterProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stakesAsync = ref.watch(distinctStakesProvider);
+    final locationsAsync = ref.watch(distinctLocationsProvider);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: ListView(
+          controller: scrollController,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text('Filter Sessions',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+
+            // Game Type
+            Text('Game Type',
+                style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final entry in [
+                  ('cash', 'Cash Game'),
+                  ('tournament', 'Tournament'),
+                ])
+                  FilterChip(
+                    label: Text(entry.$2),
+                    selected: _draft.gameType == entry.$1,
+                    onSelected: (on) => setState(() => _draft = _draft.copyWith(
+                        gameType: on ? entry.$1 : null)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Result
+            Text('Result', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilterChip(
+                  label: const Text('Winning'),
+                  selected: _draft.result == SessionResult.win,
+                  onSelected: (on) => setState(() => _draft = _draft.copyWith(
+                      result: on ? SessionResult.win : null)),
+                ),
+                FilterChip(
+                  label: const Text('Losing'),
+                  selected: _draft.result == SessionResult.loss,
+                  onSelected: (on) => setState(() => _draft = _draft.copyWith(
+                      result: on ? SessionResult.loss : null)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Stakes
+            stakesAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+              data: (stakes) {
+                if (stakes.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Stakes',
+                        style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: stakes
+                          .map((s) => FilterChip(
+                                label: Text(s),
+                                selected: _draft.stakes == s,
+                                onSelected: (on) => setState(() =>
+                                    _draft = _draft.copyWith(
+                                        stakes: on ? s : null)),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                );
+              },
+            ),
+
+            // Location
+            locationsAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+              data: (locs) {
+                if (locs.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Location',
+                        style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: locs
+                          .map((l) => FilterChip(
+                                label: Text(l),
+                                selected: _draft.location == l,
+                                onSelected: (on) => setState(() =>
+                                    _draft = _draft.copyWith(
+                                        location: on ? l : null)),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                );
+              },
+            ),
+
+            // Date range
+            Text('Date Range',
+                style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _DateButton(
+                    label: 'From',
+                    value: _draft.dateFrom,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _draft.dateFrom != null
+                            ? DateTime.parse(_draft.dateFrom!)
+                            : DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => _draft = _draft.copyWith(
+                            dateFrom: DateFormat('yyyy-MM-dd').format(picked)));
+                      }
+                    },
+                    onClear: () => setState(
+                        () => _draft = _draft.copyWith(dateFrom: null)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DateButton(
+                    label: 'To',
+                    value: _draft.dateTo,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _draft.dateTo != null
+                            ? DateTime.parse(_draft.dateTo!)
+                            : DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => _draft = _draft.copyWith(
+                            dateTo: DateFormat('yyyy-MM-dd').format(picked)));
+                      }
+                    },
+                    onClear: () =>
+                        setState(() => _draft = _draft.copyWith(dateTo: null)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      ref
+                          .read(filterProvider.notifier)
+                          .state = const SessionFilter();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Clear All'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      ref.read(filterProvider.notifier).state = _draft;
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Apply'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateButton extends StatelessWidget {
+  final String label;
+  final String? value;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  const _DateButton({
+    required this.label,
+    required this.value,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final display = value != null
+        ? DateFormat('MMM d, yyyy').format(DateTime.parse(value!))
+        : 'Any';
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.calendar_today, size: 16),
+      label: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.outline)),
+          Text(display, style: Theme.of(context).textTheme.bodySmall),
+        ],
       ),
     );
   }
@@ -56,7 +366,9 @@ class _SessionList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groups = _groupByMonth();
-    final slivers = <Widget>[const SliverPadding(padding: EdgeInsets.only(top: 8))];
+    final slivers = <Widget>[
+      const SliverPadding(padding: EdgeInsets.only(top: 8))
+    ];
 
     for (final entry in groups.entries) {
       slivers.add(SliverPersistentHeader(
@@ -70,7 +382,8 @@ class _SessionList extends StatelessWidget {
             onTap: () => Navigator.push(
               ctx,
               MaterialPageRoute(
-                builder: (_) => SessionDetailScreen(session: entry.value[i]),
+                builder: (_) =>
+                    SessionDetailScreen(session: entry.value[i]),
               ),
             ),
           ),
@@ -95,7 +408,8 @@ class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get minExtent => 40;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Theme.of(context).colorScheme.surface,
       alignment: Alignment.centerLeft,
@@ -103,9 +417,9 @@ class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
       child: Text(
         month,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.bold,
-        ),
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
       ),
     );
   }

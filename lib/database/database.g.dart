@@ -146,6 +146,84 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _rakePaidMeta = const VerificationMeta(
+    'rakePaid',
+  );
+  @override
+  late final GeneratedColumn<double> rakePaid = GeneratedColumn<double>(
+    'rake_paid',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _finishPositionMeta = const VerificationMeta(
+    'finishPosition',
+  );
+  @override
+  late final GeneratedColumn<int> finishPosition = GeneratedColumn<int>(
+    'finish_position',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _totalEntrantsMeta = const VerificationMeta(
+    'totalEntrants',
+  );
+  @override
+  late final GeneratedColumn<int> totalEntrants = GeneratedColumn<int>(
+    'total_entrants',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _prizeWonMeta = const VerificationMeta(
+    'prizeWon',
+  );
+  @override
+  late final GeneratedColumn<double> prizeWon = GeneratedColumn<double>(
+    'prize_won',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tableQualityMeta = const VerificationMeta(
+    'tableQuality',
+  );
+  @override
+  late final GeneratedColumn<int> tableQuality = GeneratedColumn<int>(
+    'table_quality',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _currencyMeta = const VerificationMeta(
+    'currency',
+  );
+  @override
+  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
+    'currency',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('CAD'),
+  );
+  static const VerificationMeta _handsPerHourMeta = const VerificationMeta(
+    'handsPerHour',
+  );
+  @override
+  late final GeneratedColumn<int> handsPerHour = GeneratedColumn<int>(
+    'hands_per_hour',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -161,6 +239,13 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     location,
     notes,
     createdAt,
+    rakePaid,
+    finishPosition,
+    totalEntrants,
+    prizeWon,
+    tableQuality,
+    currency,
+    handsPerHour,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -270,6 +355,60 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('rake_paid')) {
+      context.handle(
+        _rakePaidMeta,
+        rakePaid.isAcceptableOrUnknown(data['rake_paid']!, _rakePaidMeta),
+      );
+    }
+    if (data.containsKey('finish_position')) {
+      context.handle(
+        _finishPositionMeta,
+        finishPosition.isAcceptableOrUnknown(
+          data['finish_position']!,
+          _finishPositionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('total_entrants')) {
+      context.handle(
+        _totalEntrantsMeta,
+        totalEntrants.isAcceptableOrUnknown(
+          data['total_entrants']!,
+          _totalEntrantsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('prize_won')) {
+      context.handle(
+        _prizeWonMeta,
+        prizeWon.isAcceptableOrUnknown(data['prize_won']!, _prizeWonMeta),
+      );
+    }
+    if (data.containsKey('table_quality')) {
+      context.handle(
+        _tableQualityMeta,
+        tableQuality.isAcceptableOrUnknown(
+          data['table_quality']!,
+          _tableQualityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('currency')) {
+      context.handle(
+        _currencyMeta,
+        currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta),
+      );
+    }
+    if (data.containsKey('hands_per_hour')) {
+      context.handle(
+        _handsPerHourMeta,
+        handsPerHour.isAcceptableOrUnknown(
+          data['hands_per_hour']!,
+          _handsPerHourMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -331,6 +470,34 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
       )!,
+      rakePaid: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}rake_paid'],
+      ),
+      finishPosition: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}finish_position'],
+      ),
+      totalEntrants: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_entrants'],
+      ),
+      prizeWon: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}prize_won'],
+      ),
+      tableQuality: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}table_quality'],
+      ),
+      currency: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}currency'],
+      )!,
+      handsPerHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hands_per_hour'],
+      ),
     );
   }
 
@@ -354,6 +521,13 @@ class Session extends DataClass implements Insertable<Session> {
   final String? location;
   final String? notes;
   final String createdAt;
+  final double? rakePaid;
+  final int? finishPosition;
+  final int? totalEntrants;
+  final double? prizeWon;
+  final int? tableQuality;
+  final String currency;
+  final int? handsPerHour;
   const Session({
     required this.id,
     required this.date,
@@ -368,6 +542,13 @@ class Session extends DataClass implements Insertable<Session> {
     this.location,
     this.notes,
     required this.createdAt,
+    this.rakePaid,
+    this.finishPosition,
+    this.totalEntrants,
+    this.prizeWon,
+    this.tableQuality,
+    required this.currency,
+    this.handsPerHour,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -389,6 +570,25 @@ class Session extends DataClass implements Insertable<Session> {
       map['notes'] = Variable<String>(notes);
     }
     map['created_at'] = Variable<String>(createdAt);
+    if (!nullToAbsent || rakePaid != null) {
+      map['rake_paid'] = Variable<double>(rakePaid);
+    }
+    if (!nullToAbsent || finishPosition != null) {
+      map['finish_position'] = Variable<int>(finishPosition);
+    }
+    if (!nullToAbsent || totalEntrants != null) {
+      map['total_entrants'] = Variable<int>(totalEntrants);
+    }
+    if (!nullToAbsent || prizeWon != null) {
+      map['prize_won'] = Variable<double>(prizeWon);
+    }
+    if (!nullToAbsent || tableQuality != null) {
+      map['table_quality'] = Variable<int>(tableQuality);
+    }
+    map['currency'] = Variable<String>(currency);
+    if (!nullToAbsent || handsPerHour != null) {
+      map['hands_per_hour'] = Variable<int>(handsPerHour);
+    }
     return map;
   }
 
@@ -411,6 +611,25 @@ class Session extends DataClass implements Insertable<Session> {
           ? const Value.absent()
           : Value(notes),
       createdAt: Value(createdAt),
+      rakePaid: rakePaid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rakePaid),
+      finishPosition: finishPosition == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishPosition),
+      totalEntrants: totalEntrants == null && nullToAbsent
+          ? const Value.absent()
+          : Value(totalEntrants),
+      prizeWon: prizeWon == null && nullToAbsent
+          ? const Value.absent()
+          : Value(prizeWon),
+      tableQuality: tableQuality == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tableQuality),
+      currency: Value(currency),
+      handsPerHour: handsPerHour == null && nullToAbsent
+          ? const Value.absent()
+          : Value(handsPerHour),
     );
   }
 
@@ -433,6 +652,13 @@ class Session extends DataClass implements Insertable<Session> {
       location: serializer.fromJson<String?>(json['location']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
+      rakePaid: serializer.fromJson<double?>(json['rakePaid']),
+      finishPosition: serializer.fromJson<int?>(json['finishPosition']),
+      totalEntrants: serializer.fromJson<int?>(json['totalEntrants']),
+      prizeWon: serializer.fromJson<double?>(json['prizeWon']),
+      tableQuality: serializer.fromJson<int?>(json['tableQuality']),
+      currency: serializer.fromJson<String>(json['currency']),
+      handsPerHour: serializer.fromJson<int?>(json['handsPerHour']),
     );
   }
   @override
@@ -452,6 +678,13 @@ class Session extends DataClass implements Insertable<Session> {
       'location': serializer.toJson<String?>(location),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<String>(createdAt),
+      'rakePaid': serializer.toJson<double?>(rakePaid),
+      'finishPosition': serializer.toJson<int?>(finishPosition),
+      'totalEntrants': serializer.toJson<int?>(totalEntrants),
+      'prizeWon': serializer.toJson<double?>(prizeWon),
+      'tableQuality': serializer.toJson<int?>(tableQuality),
+      'currency': serializer.toJson<String>(currency),
+      'handsPerHour': serializer.toJson<int?>(handsPerHour),
     };
   }
 
@@ -469,6 +702,13 @@ class Session extends DataClass implements Insertable<Session> {
     Value<String?> location = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     String? createdAt,
+    Value<double?> rakePaid = const Value.absent(),
+    Value<int?> finishPosition = const Value.absent(),
+    Value<int?> totalEntrants = const Value.absent(),
+    Value<double?> prizeWon = const Value.absent(),
+    Value<int?> tableQuality = const Value.absent(),
+    String? currency,
+    Value<int?> handsPerHour = const Value.absent(),
   }) => Session(
     id: id ?? this.id,
     date: date ?? this.date,
@@ -483,6 +723,17 @@ class Session extends DataClass implements Insertable<Session> {
     location: location.present ? location.value : this.location,
     notes: notes.present ? notes.value : this.notes,
     createdAt: createdAt ?? this.createdAt,
+    rakePaid: rakePaid.present ? rakePaid.value : this.rakePaid,
+    finishPosition: finishPosition.present
+        ? finishPosition.value
+        : this.finishPosition,
+    totalEntrants: totalEntrants.present
+        ? totalEntrants.value
+        : this.totalEntrants,
+    prizeWon: prizeWon.present ? prizeWon.value : this.prizeWon,
+    tableQuality: tableQuality.present ? tableQuality.value : this.tableQuality,
+    currency: currency ?? this.currency,
+    handsPerHour: handsPerHour.present ? handsPerHour.value : this.handsPerHour,
   );
   Session copyWithCompanion(SessionsCompanion data) {
     return Session(
@@ -503,6 +754,21 @@ class Session extends DataClass implements Insertable<Session> {
       location: data.location.present ? data.location.value : this.location,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      rakePaid: data.rakePaid.present ? data.rakePaid.value : this.rakePaid,
+      finishPosition: data.finishPosition.present
+          ? data.finishPosition.value
+          : this.finishPosition,
+      totalEntrants: data.totalEntrants.present
+          ? data.totalEntrants.value
+          : this.totalEntrants,
+      prizeWon: data.prizeWon.present ? data.prizeWon.value : this.prizeWon,
+      tableQuality: data.tableQuality.present
+          ? data.tableQuality.value
+          : this.tableQuality,
+      currency: data.currency.present ? data.currency.value : this.currency,
+      handsPerHour: data.handsPerHour.present
+          ? data.handsPerHour.value
+          : this.handsPerHour,
     );
   }
 
@@ -521,7 +787,14 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('durationMinutes: $durationMinutes, ')
           ..write('location: $location, ')
           ..write('notes: $notes, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('rakePaid: $rakePaid, ')
+          ..write('finishPosition: $finishPosition, ')
+          ..write('totalEntrants: $totalEntrants, ')
+          ..write('prizeWon: $prizeWon, ')
+          ..write('tableQuality: $tableQuality, ')
+          ..write('currency: $currency, ')
+          ..write('handsPerHour: $handsPerHour')
           ..write(')'))
         .toString();
   }
@@ -541,6 +814,13 @@ class Session extends DataClass implements Insertable<Session> {
     location,
     notes,
     createdAt,
+    rakePaid,
+    finishPosition,
+    totalEntrants,
+    prizeWon,
+    tableQuality,
+    currency,
+    handsPerHour,
   );
   @override
   bool operator ==(Object other) =>
@@ -558,7 +838,14 @@ class Session extends DataClass implements Insertable<Session> {
           other.durationMinutes == this.durationMinutes &&
           other.location == this.location &&
           other.notes == this.notes &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.rakePaid == this.rakePaid &&
+          other.finishPosition == this.finishPosition &&
+          other.totalEntrants == this.totalEntrants &&
+          other.prizeWon == this.prizeWon &&
+          other.tableQuality == this.tableQuality &&
+          other.currency == this.currency &&
+          other.handsPerHour == this.handsPerHour);
 }
 
 class SessionsCompanion extends UpdateCompanion<Session> {
@@ -575,6 +862,13 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<String?> location;
   final Value<String?> notes;
   final Value<String> createdAt;
+  final Value<double?> rakePaid;
+  final Value<int?> finishPosition;
+  final Value<int?> totalEntrants;
+  final Value<double?> prizeWon;
+  final Value<int?> tableQuality;
+  final Value<String> currency;
+  final Value<int?> handsPerHour;
   const SessionsCompanion({
     this.id = const Value.absent(),
     this.date = const Value.absent(),
@@ -589,6 +883,13 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.location = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rakePaid = const Value.absent(),
+    this.finishPosition = const Value.absent(),
+    this.totalEntrants = const Value.absent(),
+    this.prizeWon = const Value.absent(),
+    this.tableQuality = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.handsPerHour = const Value.absent(),
   });
   SessionsCompanion.insert({
     this.id = const Value.absent(),
@@ -604,6 +905,13 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.location = const Value.absent(),
     this.notes = const Value.absent(),
     required String createdAt,
+    this.rakePaid = const Value.absent(),
+    this.finishPosition = const Value.absent(),
+    this.totalEntrants = const Value.absent(),
+    this.prizeWon = const Value.absent(),
+    this.tableQuality = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.handsPerHour = const Value.absent(),
   }) : date = Value(date),
        stakes = Value(stakes),
        buyIn = Value(buyIn),
@@ -627,6 +935,13 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<String>? location,
     Expression<String>? notes,
     Expression<String>? createdAt,
+    Expression<double>? rakePaid,
+    Expression<int>? finishPosition,
+    Expression<int>? totalEntrants,
+    Expression<double>? prizeWon,
+    Expression<int>? tableQuality,
+    Expression<String>? currency,
+    Expression<int>? handsPerHour,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -642,6 +957,13 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (location != null) 'location': location,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
+      if (rakePaid != null) 'rake_paid': rakePaid,
+      if (finishPosition != null) 'finish_position': finishPosition,
+      if (totalEntrants != null) 'total_entrants': totalEntrants,
+      if (prizeWon != null) 'prize_won': prizeWon,
+      if (tableQuality != null) 'table_quality': tableQuality,
+      if (currency != null) 'currency': currency,
+      if (handsPerHour != null) 'hands_per_hour': handsPerHour,
     });
   }
 
@@ -659,6 +981,13 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Value<String?>? location,
     Value<String?>? notes,
     Value<String>? createdAt,
+    Value<double?>? rakePaid,
+    Value<int?>? finishPosition,
+    Value<int?>? totalEntrants,
+    Value<double?>? prizeWon,
+    Value<int?>? tableQuality,
+    Value<String>? currency,
+    Value<int?>? handsPerHour,
   }) {
     return SessionsCompanion(
       id: id ?? this.id,
@@ -674,6 +1003,13 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       location: location ?? this.location,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      rakePaid: rakePaid ?? this.rakePaid,
+      finishPosition: finishPosition ?? this.finishPosition,
+      totalEntrants: totalEntrants ?? this.totalEntrants,
+      prizeWon: prizeWon ?? this.prizeWon,
+      tableQuality: tableQuality ?? this.tableQuality,
+      currency: currency ?? this.currency,
+      handsPerHour: handsPerHour ?? this.handsPerHour,
     );
   }
 
@@ -719,6 +1055,27 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
+    if (rakePaid.present) {
+      map['rake_paid'] = Variable<double>(rakePaid.value);
+    }
+    if (finishPosition.present) {
+      map['finish_position'] = Variable<int>(finishPosition.value);
+    }
+    if (totalEntrants.present) {
+      map['total_entrants'] = Variable<int>(totalEntrants.value);
+    }
+    if (prizeWon.present) {
+      map['prize_won'] = Variable<double>(prizeWon.value);
+    }
+    if (tableQuality.present) {
+      map['table_quality'] = Variable<int>(tableQuality.value);
+    }
+    if (currency.present) {
+      map['currency'] = Variable<String>(currency.value);
+    }
+    if (handsPerHour.present) {
+      map['hands_per_hour'] = Variable<int>(handsPerHour.value);
+    }
     return map;
   }
 
@@ -737,7 +1094,366 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('durationMinutes: $durationMinutes, ')
           ..write('location: $location, ')
           ..write('notes: $notes, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('rakePaid: $rakePaid, ')
+          ..write('finishPosition: $finishPosition, ')
+          ..write('totalEntrants: $totalEntrants, ')
+          ..write('prizeWon: $prizeWon, ')
+          ..write('tableQuality: $tableQuality, ')
+          ..write('currency: $currency, ')
+          ..write('handsPerHour: $handsPerHour')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RakePresetsTable extends RakePresets
+    with TableInfo<$RakePresetsTable, RakePreset> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RakePresetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gameTypeMeta = const VerificationMeta(
+    'gameType',
+  );
+  @override
+  late final GeneratedColumn<String> gameType = GeneratedColumn<String>(
+    'game_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stakesMeta = const VerificationMeta('stakes');
+  @override
+  late final GeneratedColumn<String> stakes = GeneratedColumn<String>(
+    'stakes',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rakeAmountMeta = const VerificationMeta(
+    'rakeAmount',
+  );
+  @override
+  late final GeneratedColumn<double> rakeAmount = GeneratedColumn<double>(
+    'rake_amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    location,
+    gameType,
+    stakes,
+    rakeAmount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'rake_presets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RakePreset> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_locationMeta);
+    }
+    if (data.containsKey('game_type')) {
+      context.handle(
+        _gameTypeMeta,
+        gameType.isAcceptableOrUnknown(data['game_type']!, _gameTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_gameTypeMeta);
+    }
+    if (data.containsKey('stakes')) {
+      context.handle(
+        _stakesMeta,
+        stakes.isAcceptableOrUnknown(data['stakes']!, _stakesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stakesMeta);
+    }
+    if (data.containsKey('rake_amount')) {
+      context.handle(
+        _rakeAmountMeta,
+        rakeAmount.isAcceptableOrUnknown(data['rake_amount']!, _rakeAmountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rakeAmountMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RakePreset map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RakePreset(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      )!,
+      gameType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}game_type'],
+      )!,
+      stakes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stakes'],
+      )!,
+      rakeAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}rake_amount'],
+      )!,
+    );
+  }
+
+  @override
+  $RakePresetsTable createAlias(String alias) {
+    return $RakePresetsTable(attachedDatabase, alias);
+  }
+}
+
+class RakePreset extends DataClass implements Insertable<RakePreset> {
+  final int id;
+  final String location;
+  final String gameType;
+  final String stakes;
+  final double rakeAmount;
+  const RakePreset({
+    required this.id,
+    required this.location,
+    required this.gameType,
+    required this.stakes,
+    required this.rakeAmount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['location'] = Variable<String>(location);
+    map['game_type'] = Variable<String>(gameType);
+    map['stakes'] = Variable<String>(stakes);
+    map['rake_amount'] = Variable<double>(rakeAmount);
+    return map;
+  }
+
+  RakePresetsCompanion toCompanion(bool nullToAbsent) {
+    return RakePresetsCompanion(
+      id: Value(id),
+      location: Value(location),
+      gameType: Value(gameType),
+      stakes: Value(stakes),
+      rakeAmount: Value(rakeAmount),
+    );
+  }
+
+  factory RakePreset.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RakePreset(
+      id: serializer.fromJson<int>(json['id']),
+      location: serializer.fromJson<String>(json['location']),
+      gameType: serializer.fromJson<String>(json['gameType']),
+      stakes: serializer.fromJson<String>(json['stakes']),
+      rakeAmount: serializer.fromJson<double>(json['rakeAmount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'location': serializer.toJson<String>(location),
+      'gameType': serializer.toJson<String>(gameType),
+      'stakes': serializer.toJson<String>(stakes),
+      'rakeAmount': serializer.toJson<double>(rakeAmount),
+    };
+  }
+
+  RakePreset copyWith({
+    int? id,
+    String? location,
+    String? gameType,
+    String? stakes,
+    double? rakeAmount,
+  }) => RakePreset(
+    id: id ?? this.id,
+    location: location ?? this.location,
+    gameType: gameType ?? this.gameType,
+    stakes: stakes ?? this.stakes,
+    rakeAmount: rakeAmount ?? this.rakeAmount,
+  );
+  RakePreset copyWithCompanion(RakePresetsCompanion data) {
+    return RakePreset(
+      id: data.id.present ? data.id.value : this.id,
+      location: data.location.present ? data.location.value : this.location,
+      gameType: data.gameType.present ? data.gameType.value : this.gameType,
+      stakes: data.stakes.present ? data.stakes.value : this.stakes,
+      rakeAmount: data.rakeAmount.present
+          ? data.rakeAmount.value
+          : this.rakeAmount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RakePreset(')
+          ..write('id: $id, ')
+          ..write('location: $location, ')
+          ..write('gameType: $gameType, ')
+          ..write('stakes: $stakes, ')
+          ..write('rakeAmount: $rakeAmount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, location, gameType, stakes, rakeAmount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RakePreset &&
+          other.id == this.id &&
+          other.location == this.location &&
+          other.gameType == this.gameType &&
+          other.stakes == this.stakes &&
+          other.rakeAmount == this.rakeAmount);
+}
+
+class RakePresetsCompanion extends UpdateCompanion<RakePreset> {
+  final Value<int> id;
+  final Value<String> location;
+  final Value<String> gameType;
+  final Value<String> stakes;
+  final Value<double> rakeAmount;
+  const RakePresetsCompanion({
+    this.id = const Value.absent(),
+    this.location = const Value.absent(),
+    this.gameType = const Value.absent(),
+    this.stakes = const Value.absent(),
+    this.rakeAmount = const Value.absent(),
+  });
+  RakePresetsCompanion.insert({
+    this.id = const Value.absent(),
+    required String location,
+    required String gameType,
+    required String stakes,
+    required double rakeAmount,
+  }) : location = Value(location),
+       gameType = Value(gameType),
+       stakes = Value(stakes),
+       rakeAmount = Value(rakeAmount);
+  static Insertable<RakePreset> custom({
+    Expression<int>? id,
+    Expression<String>? location,
+    Expression<String>? gameType,
+    Expression<String>? stakes,
+    Expression<double>? rakeAmount,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (location != null) 'location': location,
+      if (gameType != null) 'game_type': gameType,
+      if (stakes != null) 'stakes': stakes,
+      if (rakeAmount != null) 'rake_amount': rakeAmount,
+    });
+  }
+
+  RakePresetsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? location,
+    Value<String>? gameType,
+    Value<String>? stakes,
+    Value<double>? rakeAmount,
+  }) {
+    return RakePresetsCompanion(
+      id: id ?? this.id,
+      location: location ?? this.location,
+      gameType: gameType ?? this.gameType,
+      stakes: stakes ?? this.stakes,
+      rakeAmount: rakeAmount ?? this.rakeAmount,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (gameType.present) {
+      map['game_type'] = Variable<String>(gameType.value);
+    }
+    if (stakes.present) {
+      map['stakes'] = Variable<String>(stakes.value);
+    }
+    if (rakeAmount.present) {
+      map['rake_amount'] = Variable<double>(rakeAmount.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RakePresetsCompanion(')
+          ..write('id: $id, ')
+          ..write('location: $location, ')
+          ..write('gameType: $gameType, ')
+          ..write('stakes: $stakes, ')
+          ..write('rakeAmount: $rakeAmount')
           ..write(')'))
         .toString();
   }
@@ -747,11 +1463,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $SessionsTable sessions = $SessionsTable(this);
+  late final $RakePresetsTable rakePresets = $RakePresetsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [sessions];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [sessions, rakePresets];
 }
 
 typedef $$SessionsTableCreateCompanionBuilder =
@@ -769,6 +1486,13 @@ typedef $$SessionsTableCreateCompanionBuilder =
       Value<String?> location,
       Value<String?> notes,
       required String createdAt,
+      Value<double?> rakePaid,
+      Value<int?> finishPosition,
+      Value<int?> totalEntrants,
+      Value<double?> prizeWon,
+      Value<int?> tableQuality,
+      Value<String> currency,
+      Value<int?> handsPerHour,
     });
 typedef $$SessionsTableUpdateCompanionBuilder =
     SessionsCompanion Function({
@@ -785,6 +1509,13 @@ typedef $$SessionsTableUpdateCompanionBuilder =
       Value<String?> location,
       Value<String?> notes,
       Value<String> createdAt,
+      Value<double?> rakePaid,
+      Value<int?> finishPosition,
+      Value<int?> totalEntrants,
+      Value<double?> prizeWon,
+      Value<int?> tableQuality,
+      Value<String> currency,
+      Value<int?> handsPerHour,
     });
 
 class $$SessionsTableFilterComposer
@@ -858,6 +1589,41 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get rakePaid => $composableBuilder(
+    column: $table.rakePaid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get finishPosition => $composableBuilder(
+    column: $table.finishPosition,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get totalEntrants => $composableBuilder(
+    column: $table.totalEntrants,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get prizeWon => $composableBuilder(
+    column: $table.prizeWon,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get tableQuality => $composableBuilder(
+    column: $table.tableQuality,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get handsPerHour => $composableBuilder(
+    column: $table.handsPerHour,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -935,6 +1701,41 @@ class $$SessionsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get rakePaid => $composableBuilder(
+    column: $table.rakePaid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get finishPosition => $composableBuilder(
+    column: $table.finishPosition,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get totalEntrants => $composableBuilder(
+    column: $table.totalEntrants,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get prizeWon => $composableBuilder(
+    column: $table.prizeWon,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get tableQuality => $composableBuilder(
+    column: $table.tableQuality,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get handsPerHour => $composableBuilder(
+    column: $table.handsPerHour,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SessionsTableAnnotationComposer
@@ -988,6 +1789,35 @@ class $$SessionsTableAnnotationComposer
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<double> get rakePaid =>
+      $composableBuilder(column: $table.rakePaid, builder: (column) => column);
+
+  GeneratedColumn<int> get finishPosition => $composableBuilder(
+    column: $table.finishPosition,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get totalEntrants => $composableBuilder(
+    column: $table.totalEntrants,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get prizeWon =>
+      $composableBuilder(column: $table.prizeWon, builder: (column) => column);
+
+  GeneratedColumn<int> get tableQuality => $composableBuilder(
+    column: $table.tableQuality,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get currency =>
+      $composableBuilder(column: $table.currency, builder: (column) => column);
+
+  GeneratedColumn<int> get handsPerHour => $composableBuilder(
+    column: $table.handsPerHour,
+    builder: (column) => column,
+  );
 }
 
 class $$SessionsTableTableManager
@@ -1031,6 +1861,13 @@ class $$SessionsTableTableManager
                 Value<String?> location = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
+                Value<double?> rakePaid = const Value.absent(),
+                Value<int?> finishPosition = const Value.absent(),
+                Value<int?> totalEntrants = const Value.absent(),
+                Value<double?> prizeWon = const Value.absent(),
+                Value<int?> tableQuality = const Value.absent(),
+                Value<String> currency = const Value.absent(),
+                Value<int?> handsPerHour = const Value.absent(),
               }) => SessionsCompanion(
                 id: id,
                 date: date,
@@ -1045,6 +1882,13 @@ class $$SessionsTableTableManager
                 location: location,
                 notes: notes,
                 createdAt: createdAt,
+                rakePaid: rakePaid,
+                finishPosition: finishPosition,
+                totalEntrants: totalEntrants,
+                prizeWon: prizeWon,
+                tableQuality: tableQuality,
+                currency: currency,
+                handsPerHour: handsPerHour,
               ),
           createCompanionCallback:
               ({
@@ -1061,6 +1905,13 @@ class $$SessionsTableTableManager
                 Value<String?> location = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 required String createdAt,
+                Value<double?> rakePaid = const Value.absent(),
+                Value<int?> finishPosition = const Value.absent(),
+                Value<int?> totalEntrants = const Value.absent(),
+                Value<double?> prizeWon = const Value.absent(),
+                Value<int?> tableQuality = const Value.absent(),
+                Value<String> currency = const Value.absent(),
+                Value<int?> handsPerHour = const Value.absent(),
               }) => SessionsCompanion.insert(
                 id: id,
                 date: date,
@@ -1075,6 +1926,13 @@ class $$SessionsTableTableManager
                 location: location,
                 notes: notes,
                 createdAt: createdAt,
+                rakePaid: rakePaid,
+                finishPosition: finishPosition,
+                totalEntrants: totalEntrants,
+                prizeWon: prizeWon,
+                tableQuality: tableQuality,
+                currency: currency,
+                handsPerHour: handsPerHour,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -1098,10 +1956,208 @@ typedef $$SessionsTableProcessedTableManager =
       Session,
       PrefetchHooks Function()
     >;
+typedef $$RakePresetsTableCreateCompanionBuilder =
+    RakePresetsCompanion Function({
+      Value<int> id,
+      required String location,
+      required String gameType,
+      required String stakes,
+      required double rakeAmount,
+    });
+typedef $$RakePresetsTableUpdateCompanionBuilder =
+    RakePresetsCompanion Function({
+      Value<int> id,
+      Value<String> location,
+      Value<String> gameType,
+      Value<String> stakes,
+      Value<double> rakeAmount,
+    });
+
+class $$RakePresetsTableFilterComposer
+    extends Composer<_$AppDatabase, $RakePresetsTable> {
+  $$RakePresetsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get gameType => $composableBuilder(
+    column: $table.gameType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stakes => $composableBuilder(
+    column: $table.stakes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get rakeAmount => $composableBuilder(
+    column: $table.rakeAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RakePresetsTableOrderingComposer
+    extends Composer<_$AppDatabase, $RakePresetsTable> {
+  $$RakePresetsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get gameType => $composableBuilder(
+    column: $table.gameType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stakes => $composableBuilder(
+    column: $table.stakes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get rakeAmount => $composableBuilder(
+    column: $table.rakeAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RakePresetsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RakePresetsTable> {
+  $$RakePresetsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<String> get gameType =>
+      $composableBuilder(column: $table.gameType, builder: (column) => column);
+
+  GeneratedColumn<String> get stakes =>
+      $composableBuilder(column: $table.stakes, builder: (column) => column);
+
+  GeneratedColumn<double> get rakeAmount => $composableBuilder(
+    column: $table.rakeAmount,
+    builder: (column) => column,
+  );
+}
+
+class $$RakePresetsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RakePresetsTable,
+          RakePreset,
+          $$RakePresetsTableFilterComposer,
+          $$RakePresetsTableOrderingComposer,
+          $$RakePresetsTableAnnotationComposer,
+          $$RakePresetsTableCreateCompanionBuilder,
+          $$RakePresetsTableUpdateCompanionBuilder,
+          (
+            RakePreset,
+            BaseReferences<_$AppDatabase, $RakePresetsTable, RakePreset>,
+          ),
+          RakePreset,
+          PrefetchHooks Function()
+        > {
+  $$RakePresetsTableTableManager(_$AppDatabase db, $RakePresetsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RakePresetsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RakePresetsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RakePresetsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> location = const Value.absent(),
+                Value<String> gameType = const Value.absent(),
+                Value<String> stakes = const Value.absent(),
+                Value<double> rakeAmount = const Value.absent(),
+              }) => RakePresetsCompanion(
+                id: id,
+                location: location,
+                gameType: gameType,
+                stakes: stakes,
+                rakeAmount: rakeAmount,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String location,
+                required String gameType,
+                required String stakes,
+                required double rakeAmount,
+              }) => RakePresetsCompanion.insert(
+                id: id,
+                location: location,
+                gameType: gameType,
+                stakes: stakes,
+                rakeAmount: rakeAmount,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RakePresetsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RakePresetsTable,
+      RakePreset,
+      $$RakePresetsTableFilterComposer,
+      $$RakePresetsTableOrderingComposer,
+      $$RakePresetsTableAnnotationComposer,
+      $$RakePresetsTableCreateCompanionBuilder,
+      $$RakePresetsTableUpdateCompanionBuilder,
+      (
+        RakePreset,
+        BaseReferences<_$AppDatabase, $RakePresetsTable, RakePreset>,
+      ),
+      RakePreset,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$SessionsTableTableManager get sessions =>
       $$SessionsTableTableManager(_db, _db.sessions);
+  $$RakePresetsTableTableManager get rakePresets =>
+      $$RakePresetsTableTableManager(_db, _db.rakePresets);
 }
