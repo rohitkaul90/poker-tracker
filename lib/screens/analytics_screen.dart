@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/poker_rooms.dart';
 import '../database/database.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
@@ -42,14 +43,28 @@ class _AnalyticsBody extends StatefulWidget {
 }
 
 class _AnalyticsBodyState extends State<_AnalyticsBody> {
-  String? _gameFilter;
+  String? _gameFilter;     // null | 'cash' | 'tournament'
+  String? _venueFilter;    // null | 'live' | 'online'
+  String? _currencyFilter; // null | 'CAD' | 'USD' | ...
 
   List<Session> get _filtered {
-    if (_gameFilter == null) return widget.sessions;
-    if (_gameFilter == 'tournament') {
-      return widget.sessions.where((s) => isTournamentType(s.gameType)).toList();
+    var result = widget.sessions;
+    if (_gameFilter != null) {
+      if (_gameFilter == 'tournament') {
+        result = result.where((s) => isTournamentType(s.gameType)).toList();
+      } else {
+        result = result.where((s) => s.gameType == 'cash').toList();
+      }
     }
-    return widget.sessions.where((s) => s.gameType == 'cash').toList();
+    if (_venueFilter == 'online') {
+      result = result.where((s) => isOnlineSession(s.location)).toList();
+    } else if (_venueFilter == 'live') {
+      result = result.where((s) => !isOnlineSession(s.location)).toList();
+    }
+    if (_currencyFilter != null) {
+      result = result.where((s) => s.currency == _currencyFilter).toList();
+    }
+    return result;
   }
 
   List<Session> get _sorted =>
@@ -58,6 +73,12 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
   bool get _hasCash => widget.sessions.any((s) => s.gameType == 'cash');
   bool get _hasTournament =>
       widget.sessions.any((s) => isTournamentType(s.gameType));
+  bool get _hasOnline =>
+      widget.sessions.any((s) => isOnlineSession(s.location));
+  bool get _hasLive =>
+      widget.sessions.any((s) => !isOnlineSession(s.location));
+  Set<String> get _allCurrencies =>
+      widget.sessions.map((s) => s.currency).toSet();
 
   @override
   Widget build(BuildContext context) {
@@ -70,13 +91,32 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
       children: [
-        // Filter chips
+        // Game type filter chips
         _GameTypeFilterChips(
           value: _gameFilter,
           hasCash: _hasCash,
           hasTournament: _hasTournament,
           onChanged: (v) => setState(() => _gameFilter = v),
         ),
+
+        // Venue filter chips (only if both live and online sessions exist)
+        if (_hasOnline && _hasLive) ...[
+          const SizedBox(height: 6),
+          _VenueFilterChips(
+            value: _venueFilter,
+            onChanged: (v) => setState(() => _venueFilter = v),
+          ),
+        ],
+
+        // Currency filter chips (only if multiple currencies in data)
+        if (_allCurrencies.length > 1) ...[
+          const SizedBox(height: 6),
+          _CurrencyFilterChips(
+            currencies: _allCurrencies,
+            value: _currencyFilter,
+            onChanged: (v) => setState(() => _currencyFilter = v),
+          ),
+        ],
         const SizedBox(height: 12),
 
         if (filtered.isEmpty)
@@ -128,17 +168,20 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
           _sectionHeader(context, 'Charts'),
           const SizedBox(height: 8),
 
-          // P&L chart with cumulative/monthly toggle
-          _PLChart(sessions: sorted),
+          // P&L chart with cumulative/monthly/yearly toggle
+          _PLChart(sessions: sorted, currencyFilter: _currencyFilter),
           const SizedBox(height: 12),
 
           // Win rate by attribute (interactive)
-          _WinRateByAttributeChart(sessions: filtered),
+          _WinRateByAttributeChart(
+            sessions: filtered,
+            hasLiveAndOnline: _hasLive && _hasOnline,
+          ),
           const SizedBox(height: 20),
 
           _sectionHeader(context, "What's Affecting Your Win Rate"),
           Text(
-            'hrs  ·  \$/hr  ·  sessions',
+            'hrs  ·  \$/hr  ·  P&L',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),
@@ -228,6 +271,15 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
               keyFn: (s) => s.location!,
             ),
           ],
+          if (_hasLive && _hasOnline) ...[
+            const SizedBox(height: 8),
+            _InsightCard(
+              title: 'Live vs Online',
+              sessions: filtered,
+              keyFn: (s) => isOnlineSession(s.location) ? 'Online' : 'Live',
+              orderedKeys: const ['Live', 'Online'],
+            ),
+          ],
           const SizedBox(height: 8),
           _InsightCard(
             title: 'By Month',
@@ -299,6 +351,74 @@ class _GameTypeFilterChips extends StatelessWidget {
   }
 }
 
+// ─── Venue Filter Chips ───────────────────────────────────────────────────────
+
+class _VenueFilterChips extends StatelessWidget {
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  const _VenueFilterChips({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        FilterChip(
+          label: const Text('All Venues'),
+          selected: value == null,
+          onSelected: (_) => onChanged(null),
+        ),
+        FilterChip(
+          label: const Text('Live'),
+          selected: value == 'live',
+          onSelected: (_) => onChanged(value == 'live' ? null : 'live'),
+        ),
+        FilterChip(
+          label: const Text('Online'),
+          selected: value == 'online',
+          onSelected: (_) => onChanged(value == 'online' ? null : 'online'),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Currency Filter Chips ────────────────────────────────────────────────────
+
+class _CurrencyFilterChips extends StatelessWidget {
+  final Set<String> currencies;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  const _CurrencyFilterChips({
+    required this.currencies,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = currencies.toList()..sort();
+    return Wrap(
+      spacing: 8,
+      children: [
+        FilterChip(
+          label: const Text('All Currencies'),
+          selected: value == null,
+          onSelected: (_) => onChanged(null),
+        ),
+        for (final c in sorted)
+          FilterChip(
+            label: Text('$c (${currencySymbol(c)})'),
+            selected: value == c,
+            onSelected: (_) => onChanged(value == c ? null : c),
+          ),
+      ],
+    );
+  }
+}
+
 // ─── Summary Stats Card ───────────────────────────────────────────────────────
 
 class _StatsCard extends StatelessWidget {
@@ -310,16 +430,16 @@ class _StatsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (sessions.isEmpty) return const SizedBox.shrink();
 
+    final currencies = sessions.map((s) => s.currency).toSet();
+    final isMultiCurrency = currencies.length > 1;
+
     final count = sessions.length;
-    final totalPL = sessions.fold(0.0, (s, e) => s + e.profitLoss);
     final totalHours =
         sessions.fold(0, (s, e) => s + e.durationMinutes) / 60.0;
-    final hourlyRate = totalHours > 0 ? totalPL / totalHours : 0.0;
 
     final tSessions =
         sessions.where((s) => isTournamentType(s.gameType)).toList();
     final hasTournaments = tSessions.isNotEmpty;
-
     final avgROI = hasTournaments
         ? tSessions.fold(
                 0.0,
@@ -346,38 +466,152 @@ class _StatsCard extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 24,
-              runSpacing: 12,
-              children: [
-                _StatItem(label: 'Sessions', value: '$count'),
-                _StatItem(
-                    label: 'Hours',
-                    value: '${totalHours.toStringAsFixed(1)}h'),
-                _StatItem(
-                  label: 'Win Rate',
-                  value: '${formatPL(hourlyRate)}/hr',
-                  valueColor: hourlyRate >= 0 ? Colors.green : Colors.red,
-                ),
-                _StatItem(
-                  label: 'Total P&L',
-                  value: formatPL(totalPL),
-                  valueColor: totalPL >= 0 ? Colors.green : Colors.red,
-                ),
-                if (avgROI != null)
+            if (isMultiCurrency) ...[
+              // Multi-currency: show sessions + hours, then per-currency P&L
+              Wrap(
+                spacing: 24,
+                runSpacing: 12,
+                children: [
+                  _StatItem(label: 'Sessions', value: '$count'),
                   _StatItem(
-                    label: 'Avg ROI',
-                    value: formatROI(avgROI),
-                    valueColor: avgROI >= 0 ? Colors.green : Colors.red,
-                  ),
-                if (itm != null && tSessions.isNotEmpty)
-                  _StatItem(
-                    label: 'ITM',
-                    value:
-                        '${(itm / tSessions.length * 100).toStringAsFixed(0)}%',
-                  ),
-              ],
-            ),
+                      label: 'Hours',
+                      value: '${totalHours.toStringAsFixed(1)}h'),
+                  if (avgROI != null)
+                    _StatItem(
+                      label: 'Avg ROI',
+                      value: formatROI(avgROI),
+                      valueColor: avgROI >= 0 ? Colors.green : Colors.red,
+                    ),
+                  if (itm != null && tSessions.isNotEmpty)
+                    _StatItem(
+                      label: 'ITM',
+                      value:
+                          '${(itm / tSessions.length * 100).toStringAsFixed(0)}%',
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'P&L by currency',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              // Per-currency P&L rows
+              ...(() {
+                final byCurrency = <String, ({double pl, double hours})>{};
+                for (final s in sessions) {
+                  final cur = s.currency;
+                  final existing = byCurrency[cur];
+                  byCurrency[cur] = (
+                    pl: (existing?.pl ?? 0) + s.profitLoss,
+                    hours: (existing?.hours ?? 0) + s.durationMinutes / 60.0,
+                  );
+                }
+                final sorted = byCurrency.entries.toList()
+                  ..sort((a, b) => a.key.compareTo(b.key));
+                return sorted.map((e) {
+                  final sym = currencySymbol(e.key);
+                  final pl = e.value.pl;
+                  final hrs = e.value.hours;
+                  final rate = hrs > 0 ? pl / hrs : 0.0;
+                  final color = pl >= 0 ? Colors.green : Colors.red;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 44,
+                          child: Text(e.key,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline)),
+                        ),
+                        Text(
+                          pl >= 0
+                              ? '+$sym${pl.toStringAsFixed(0)}'
+                              : '-$sym${pl.abs().toStringAsFixed(0)}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                  fontWeight: FontWeight.bold, color: color),
+                        ),
+                        if (hrs > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '(${formatPL(rate)}/hr)',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: color),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                });
+              })(),
+              const SizedBox(height: 4),
+              Text(
+                'Select a currency above to see combined stats.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                      fontSize: 10,
+                    ),
+              ),
+            ] else ...[
+              // Single currency: current full summary
+              Builder(builder: (context) {
+                final totalPL =
+                    sessions.fold(0.0, (s, e) => s + e.profitLoss);
+                final hourlyRate =
+                    totalHours > 0 ? totalPL / totalHours : 0.0;
+                final sym = currencySymbol(currencies.first);
+                return Wrap(
+                  spacing: 24,
+                  runSpacing: 12,
+                  children: [
+                    _StatItem(label: 'Sessions', value: '$count'),
+                    _StatItem(
+                        label: 'Hours',
+                        value: '${totalHours.toStringAsFixed(1)}h'),
+                    _StatItem(
+                      label: 'Win Rate',
+                      value: '$sym${hourlyRate.abs().toStringAsFixed(0)}/hr',
+                      valueColor:
+                          hourlyRate >= 0 ? Colors.green : Colors.red,
+                      prefix: hourlyRate >= 0 ? '+' : '-',
+                    ),
+                    _StatItem(
+                      label: 'Total P&L',
+                      value: totalPL >= 0
+                          ? '+$sym${totalPL.toStringAsFixed(0)}'
+                          : '-$sym${totalPL.abs().toStringAsFixed(0)}',
+                      valueColor: totalPL >= 0 ? Colors.green : Colors.red,
+                    ),
+                    if (avgROI != null)
+                      _StatItem(
+                        label: 'Avg ROI',
+                        value: formatROI(avgROI),
+                        valueColor:
+                            avgROI >= 0 ? Colors.green : Colors.red,
+                      ),
+                    if (itm != null && tSessions.isNotEmpty)
+                      _StatItem(
+                        label: 'ITM',
+                        value:
+                            '${(itm / tSessions.length * 100).toStringAsFixed(0)}%',
+                      ),
+                  ],
+                );
+              }),
+            ],
           ],
         ),
       ),
@@ -389,9 +623,10 @@ class _StatItem extends StatelessWidget {
   final String label;
   final String value;
   final Color? valueColor;
+  final String? prefix;
 
   const _StatItem(
-      {required this.label, required this.value, this.valueColor});
+      {required this.label, required this.value, this.valueColor, this.prefix});
 
   @override
   Widget build(BuildContext context) {
@@ -417,12 +652,13 @@ class _StatItem extends StatelessWidget {
 
 // ─── P&L Chart with Toggle ────────────────────────────────────────────────────
 
-enum _PLMode { cumulative, monthly }
+enum _PLMode { cumulative, monthly, yearly }
 
 class _PLChart extends StatefulWidget {
   final List<Session> sessions;
+  final String? currencyFilter;
 
-  const _PLChart({required this.sessions});
+  const _PLChart({required this.sessions, this.currencyFilter});
 
   @override
   State<_PLChart> createState() => _PLChartState();
@@ -433,6 +669,20 @@ class _PLChartState extends State<_PLChart> {
 
   @override
   Widget build(BuildContext context) {
+    final currencies = widget.sessions.map((s) => s.currency).toSet();
+    final isMultiCurrency =
+        widget.currencyFilter == null && currencies.length > 1;
+    final sym = isMultiCurrency
+        ? ''
+        : currencySymbol(
+            widget.currencyFilter ?? currencies.firstOrNull ?? 'CAD');
+
+    const modeLabels = {
+      _PLMode.cumulative: 'Cumulative',
+      _PLMode.monthly: 'Monthly',
+      _PLMode.yearly: 'Yearly',
+    };
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -455,7 +705,7 @@ class _PLChartState extends State<_PLChart> {
                     padding: const EdgeInsets.only(left: 6),
                     child: ChoiceChip(
                       label: Text(
-                        mode == _PLMode.cumulative ? 'Cumulative' : 'Monthly',
+                        modeLabels[mode]!,
                         style: const TextStyle(fontSize: 11),
                       ),
                       selected: _mode == mode,
@@ -466,19 +716,49 @@ class _PLChartState extends State<_PLChart> {
               ],
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 180,
-              child: _mode == _PLMode.cumulative
-                  ? _buildCumulative(context)
-                  : _buildMonthly(context),
-            ),
+            if (isMultiCurrency && _mode != _PLMode.yearly)
+              SizedBox(
+                height: 180,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.currency_exchange,
+                          color: Theme.of(context).colorScheme.outline,
+                          size: 32),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sessions use multiple currencies.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                      ),
+                      Text(
+                        'Select a currency filter to see this chart.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 180,
+                child: _mode == _PLMode.cumulative
+                    ? _buildCumulative(context, sym)
+                    : _mode == _PLMode.monthly
+                        ? _buildMonthly(context, sym)
+                        : _buildYearly(context, sym),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCumulative(BuildContext context) {
+  Widget _buildCumulative(BuildContext context, String sym) {
     final sessions = widget.sessions;
     if (sessions.length < 2) return _emptyChart('Need at least 2 sessions');
 
@@ -506,7 +786,7 @@ class _PLChartState extends State<_PLChart> {
       ],
       minY: minY - padding,
       maxY: maxY + padding,
-      titlesData: _leftTitlesOnly(),
+      titlesData: _leftTitlesOnly(sym),
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
@@ -517,10 +797,11 @@ class _PLChartState extends State<_PLChart> {
     ));
   }
 
-  Widget _buildMonthly(BuildContext context) {
+  Widget _buildMonthly(BuildContext context, String sym) {
     final sessions = widget.sessions;
     final monthMap = <String, double>{};
     for (final s in sessions) {
+      // Key is "yyyy-MM" — preserves year so Jan 2024 ≠ Jan 2025
       final key = s.date.substring(0, 7);
       monthMap[key] = (monthMap[key] ?? 0) + s.profitLoss;
     }
@@ -529,11 +810,22 @@ class _PLChartState extends State<_PLChart> {
 
     if (entries.isEmpty) return _emptyChart('No data');
 
-    final maxAbs =
-        entries.map((e) => e.value.abs()).reduce((a, b) => a > b ? a : b);
-    const months = [
-      'J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'
+    final maxAbs = entries
+        .map((e) => e.value.abs())
+        .reduce((a, b) => a > b ? a : b);
+    final effectiveMax = maxAbs < 1 ? 50.0 : maxAbs;
+
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
+
+    // Adaptive bar width
+    final barW = entries.length <= 6
+        ? 20.0
+        : entries.length <= 12
+            ? 14.0
+            : 8.0;
 
     final groups = entries.asMap().entries.map((e) {
       final val = e.value.value;
@@ -542,21 +834,24 @@ class _PLChartState extends State<_PLChart> {
           toY: val,
           fromY: 0,
           color: val >= 0 ? Colors.green : Colors.red,
-          width: 16,
+          width: barW,
           borderRadius: BorderRadius.circular(3),
         ),
       ]);
     }).toList();
 
+    // Labels: "Jan\n'24" — two lines so year is always visible
     final labels = entries.map((e) {
       final parts = e.key.split('-');
-      return months[int.parse(parts[1]) - 1];
+      final month = monthNames[int.parse(parts[1]) - 1];
+      final year = parts[0].substring(2); // "24" from "2024"
+      return "$month\n'$year";
     }).toList();
 
     return BarChart(BarChartData(
       barGroups: groups,
-      minY: -(maxAbs * 1.2),
-      maxY: maxAbs * 1.2,
+      minY: -(effectiveMax * 1.2),
+      maxY: effectiveMax * 1.2,
       gridData: const FlGridData(show: false),
       borderData: FlBorderData(show: false),
       titlesData: FlTitlesData(
@@ -568,17 +863,91 @@ class _PLChartState extends State<_PLChart> {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 60,
-            getTitlesWidget: (v, _) =>
-                Text(formatPL(v), style: const TextStyle(fontSize: 10)),
+            getTitlesWidget: (v, _) => Text(
+              '$sym${v.abs().toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 9),
+            ),
           ),
         ),
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
+            reservedSize: 36,
             getTitlesWidget: (v, meta) {
               final i = v.toInt();
               if (i < 0 || i >= labels.length) return const SizedBox();
               return Text(labels[i],
+                  style: const TextStyle(fontSize: 9),
+                  textAlign: TextAlign.center);
+            },
+          ),
+        ),
+      ),
+    ));
+  }
+
+  Widget _buildYearly(BuildContext context, String sym) {
+    final sessions = widget.sessions;
+    final yearMap = <String, double>{};
+    for (final s in sessions) {
+      final key = s.date.substring(0, 4); // "yyyy"
+      yearMap[key] = (yearMap[key] ?? 0) + s.profitLoss;
+    }
+    final entries = yearMap.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    if (entries.isEmpty) return _emptyChart('No data');
+    if (entries.length == 1) {
+      // Single year — show with context label
+    }
+
+    final maxAbs = entries
+        .map((e) => e.value.abs())
+        .reduce((a, b) => a > b ? a : b);
+    final effectiveMax = maxAbs < 1 ? 50.0 : maxAbs;
+
+    final groups = entries.asMap().entries.map((e) {
+      final val = e.value.value;
+      return BarChartGroupData(x: e.key, barRods: [
+        BarChartRodData(
+          toY: val,
+          fromY: 0,
+          color: val >= 0 ? Colors.green : Colors.red,
+          width: 32,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ]);
+    }).toList();
+
+    return BarChart(BarChartData(
+      barGroups: groups,
+      minY: -(effectiveMax * 1.2),
+      maxY: effectiveMax * 1.2,
+      gridData: const FlGridData(show: false),
+      borderData: FlBorderData(show: false),
+      titlesData: FlTitlesData(
+        topTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 64,
+            getTitlesWidget: (v, _) => Text(
+              '$sym${v.abs().toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 9),
+            ),
+          ),
+        ),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 24,
+            getTitlesWidget: (v, meta) {
+              final i = v.toInt();
+              if (i < 0 || i >= entries.length) return const SizedBox();
+              return Text(entries[i].key,
                   style: const TextStyle(fontSize: 10));
             },
           ),
@@ -587,7 +956,7 @@ class _PLChartState extends State<_PLChart> {
     ));
   }
 
-  FlTitlesData _leftTitlesOnly() => FlTitlesData(
+  FlTitlesData _leftTitlesOnly(String sym) => FlTitlesData(
         topTitles:
             const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles:
@@ -597,9 +966,11 @@ class _PLChartState extends State<_PLChart> {
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 60,
-            getTitlesWidget: (v, _) =>
-                Text(formatPL(v), style: const TextStyle(fontSize: 10)),
+            reservedSize: 64,
+            getTitlesWidget: (v, _) => Text(
+              v >= 0 ? '+$sym${v.toStringAsFixed(0)}' : '-$sym${v.abs().toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 9),
+            ),
           ),
         ),
       );
@@ -607,12 +978,16 @@ class _PLChartState extends State<_PLChart> {
 
 // ─── Win Rate by Attribute Chart ──────────────────────────────────────────────
 
-enum _WRAttr { timeOfDay, dayOfWeek, sessionLength, tableQuality, location }
+enum _WRAttr { timeOfDay, dayOfWeek, sessionLength, tableQuality, location, liveVsOnline }
 
 class _WinRateByAttributeChart extends StatefulWidget {
   final List<Session> sessions;
+  final bool hasLiveAndOnline;
 
-  const _WinRateByAttributeChart({required this.sessions});
+  const _WinRateByAttributeChart({
+    required this.sessions,
+    this.hasLiveAndOnline = false,
+  });
 
   @override
   State<_WinRateByAttributeChart> createState() =>
@@ -686,6 +1061,12 @@ class _WinRateByAttributeChartState
           null,
           (k) => k.length > 14 ? '${k.substring(0, 12)}…' : k,
         );
+      case _WRAttr.liveVsOnline:
+        return (
+          (s) => isOnlineSession(s.location) ? 'Online' : 'Live',
+          const ['Live', 'Online'],
+          (k) => k,
+        );
     }
   }
 
@@ -697,6 +1078,7 @@ class _WinRateByAttributeChartState
       _WRAttr.sessionLength,
       if (_hasTableQuality) _WRAttr.tableQuality,
       if (_hasMultipleLocations) _WRAttr.location,
+      if (widget.hasLiveAndOnline) _WRAttr.liveVsOnline,
     ];
 
     final attrLabels = {
@@ -705,7 +1087,18 @@ class _WinRateByAttributeChartState
       _WRAttr.sessionLength: 'Session Length',
       _WRAttr.tableQuality: 'Table Quality',
       _WRAttr.location: 'Location',
+      _WRAttr.liveVsOnline: 'Live vs Online',
     };
+
+    // Detect mixed currencies for a contextual note
+    final currencies = widget.sessions.map((s) => s.currency).toSet();
+    final isMultiCurrency = currencies.length > 1;
+
+    // If selected attr is no longer available, fall back to timeOfDay
+    if (!availableAttrs.contains(_attr)) {
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) => setState(() => _attr = _WRAttr.timeOfDay));
+    }
 
     final (keyFn, orderedKeys, shortLabel) = _attrConfig();
 
@@ -730,15 +1123,15 @@ class _WinRateByAttributeChartState
       }
     }
 
-    if (groups.length < 2) {
+    if (groups.isEmpty) {
       return _ChartCard(
         title: 'Win Rate by Attribute',
-        child: _emptyChart('Not enough data'),
+        child: _emptyChart('No data for this attribute'),
       );
     }
 
     final hourlyRates = groups.map((k, v) => MapEntry(
-        k, v.totalHours > 0 ? v.totalPL / v.totalHours : 0.0));
+        k, v.totalHours > 0 ? v.totalPL / v.totalHours : v.totalPL));
 
     List<String> keys;
     if (orderedKeys != null) {
@@ -751,12 +1144,23 @@ class _WinRateByAttributeChartState
         ..sort((a, b) => hourlyRates[b]!.compareTo(hourlyRates[a]!));
     }
 
+    // Ensure a non-zero Y range so fl_chart always renders bars
     final maxAbs = hourlyRates.values
         .map((v) => v.abs())
         .reduce((a, b) => a > b ? a : b);
+    final effectiveMax = maxAbs < 1 ? 50.0 : maxAbs;
     final hasNeg = hourlyRates.values.any((v) => v < 0);
-    final minY = hasNeg ? -(maxAbs * 1.25) : -(maxAbs * 0.1);
-    final maxY = maxAbs * 1.25;
+    final minY = hasNeg ? -(effectiveMax * 1.25) : -(effectiveMax * 0.1);
+    final maxY = effectiveMax * 1.25;
+
+    // Adaptive bar width so bars don't overlap on small charts
+    final barWidth = keys.length <= 3
+        ? 32.0
+        : keys.length <= 5
+            ? 24.0
+            : keys.length <= 7
+                ? 18.0
+                : 12.0;
 
     final barGroups = keys.asMap().entries.map((e) {
       final rate = hourlyRates[e.value] ?? 0.0;
@@ -767,7 +1171,7 @@ class _WinRateByAttributeChartState
             toY: rate,
             fromY: 0,
             color: rate >= 0 ? Colors.green : Colors.red,
-            width: 20,
+            width: barWidth,
             borderRadius: BorderRadius.circular(3),
           ),
         ],
@@ -780,12 +1184,39 @@ class _WinRateByAttributeChartState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Win Rate by Attribute',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Win Rate by Attribute',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (isMultiCurrency)
+                  Tooltip(
+                    message:
+                        'Sessions use multiple currencies — \$/hr values are not directly comparable. Filter by currency for accurate comparison.',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.outline),
+                        const SizedBox(width: 3),
+                        Text('Mixed currencies',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.outline,
+                                      fontSize: 10,
+                                    )),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             // Attribute selector chips
@@ -1012,9 +1443,10 @@ class _InsightRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${stats.count}x',
+              formatPL(stats.totalPL),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+                    color: stats.totalPL >= 0 ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
                   ),
             ),
           ],

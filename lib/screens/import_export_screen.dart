@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:archive/archive.dart';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -170,29 +173,71 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
       List<List<dynamic>> rows;
 
       if (ext == 'csv') {
-        final content = String.fromCharCodes(file.bytes!);
-        final all = const CsvToListConverter(eol: '\n').convert(content);
+        // Strip UTF-8 BOM if present
+        var content = String.fromCharCodes(file.bytes!);
+        if (content.startsWith('﻿')) content = content.substring(1);
+        final delimiter = _detectDelimiter(content);
+        final all = CsvToListConverter(
+          fieldDelimiter: delimiter,
+          eol: '\n',
+        ).convert(content);
         if (all.isEmpty) throw Exception('File is empty.');
         headers = all.first.map((e) => e.toString().trim()).toList();
         rows = all.skip(1).where((r) => r.isNotEmpty).toList();
       } else if (ext == 'xlsx' || ext == 'xls') {
-        final excel = Excel.decodeBytes(file.bytes!);
-        final sheetName = excel.getDefaultSheet() ?? excel.tables.keys.first;
+        Excel excel;
+        try {
+          excel = Excel.decodeBytes(file.bytes!);
+        } catch (e) {
+          if (e.toString().contains('numFmtId') ||
+              e.toString().contains('numfmt')) {
+            // Patch out built-in numFmt definitions that confuse the parser
+            final patched = _patchExcelNumFmt(file.bytes!);
+            excel = Excel.decodeBytes(patched);
+          } else {
+            rethrow;
+          }
+        }
+        final sheetNames = excel.tables.keys.toList();
+        if (sheetNames.isEmpty) throw Exception('No sheets found.');
+
+        String sheetName;
+        if (sheetNames.length == 1) {
+          sheetName = sheetNames.first;
+        } else {
+          if (!mounted) return;
+          final picked = await _pickSheet(sheetNames);
+          if (picked == null) return;
+          sheetName = picked;
+        }
+
         final sheet = excel.tables[sheetName]!;
         final allRows = sheet.rows;
         if (allRows.isEmpty) throw Exception('Sheet is empty.');
         headers = allRows.first
-            .map((c) => c?.value?.toString().trim() ?? '')
+            .map((c) => _cellValueToString(c?.value).trim())
             .toList();
         rows = allRows
             .skip(1)
-            .map((r) => r.map((c) => c?.value?.toString() ?? '').toList())
+            .map((r) => r.map((c) => _cellValueToString(c?.value)).toList())
             .where((r) => r.any((c) => c.isNotEmpty))
             .toList();
       } else {
         throw Exception('Unsupported file type: $ext');
       }
 
+      // Remove completely empty header columns, keeping row data in sync.
+      // If we only filter headers and leave rows unchanged, column indices
+      // would be misaligned for any file that has blank header columns.
+      final nonEmptyIdx = <int>[];
+      for (int i = 0; i < headers.length; i++) {
+        if (headers[i].isNotEmpty) nonEmptyIdx.add(i);
+      }
+      headers = [for (final i in nonEmptyIdx) headers[i]];
+      rows = rows
+          .map((r) => [for (final i in nonEmptyIdx) i < r.length ? r[i] : ''])
+          .where((r) => r.any((c) => c.isNotEmpty))
+          .toList();
       if (headers.isEmpty) throw Exception('No headers found.');
       if (rows.isEmpty) throw Exception('No data rows found.');
 
@@ -211,6 +256,80 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
       _showSnack('Import failed: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  // The excel package's TextCellValue wraps its own TextSpan type (not
+  // Flutter's). Its toString() already returns plain text, but formula cells
+  // (FormulaCellValue) return the formula string and ignore the <v> cached
+  // result. For data we care about (numbers, dates, text) the correct value
+  // is in the non-formula branches, so plain toString() is fine here.
+  String _cellValueToString(CellValue? value) {
+    if (value == null) return '';
+    return value.toString();
+  }
+
+  String _detectDelimiter(String content) {
+    final sample = content.split('\n').take(5).join('\n');
+    final commas = ','.allMatches(sample).length;
+    final semicolons = ';'.allMatches(sample).length;
+    final tabs = '\t'.allMatches(sample).length;
+    if (semicolons > commas && semicolons > tabs) return ';';
+    if (tabs > commas && tabs > semicolons) return '\t';
+    return ',';
+  }
+
+  Future<String?> _pickSheet(List<String> sheetNames) {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text('Select sheet'),
+        children: sheetNames
+            .map((name) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, name),
+                  child: Text(name),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  /// Removes `numFmt` elements with id &lt; 164 from xl/styles.xml inside the
+  /// xlsx ZIP. These are built-in Excel formats that the excel package
+  /// incorrectly rejects when apps embed them explicitly.
+  Uint8List _patchExcelNumFmt(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final stylesFile = archive.findFile('xl/styles.xml');
+      if (stylesFile == null) return bytes;
+
+      var xml = utf8.decode(stylesFile.content as List<int>);
+
+      // Remove any <numFmt .../> or <numFmt ...></numFmt> with id < 164
+      xml = xml.replaceAllMapped(
+        RegExp(
+            r'<numFmt\s[^>]*numFmtId="(\d+)"[^>]*/?>(?:</numFmt>)?',
+            caseSensitive: false),
+        (m) {
+          final id = int.tryParse(m.group(1) ?? '999') ?? 999;
+          return id < 164 ? '' : m.group(0)!;
+        },
+      );
+
+      final patchedBytes = utf8.encode(xml);
+      final newArchive = Archive();
+      for (final file in archive) {
+        if (file.name == 'xl/styles.xml') {
+          newArchive.addFile(ArchiveFile(
+              'xl/styles.xml', patchedBytes.length, patchedBytes));
+        } else {
+          newArchive.addFile(file);
+        }
+      }
+      final encoded = ZipEncoder().encode(newArchive);
+      return encoded != null ? Uint8List.fromList(encoded) : bytes;
+    } catch (_) {
+      return bytes;
     }
   }
 
@@ -285,10 +404,12 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '• Required columns: Date, Stakes, Buy-in\n'
-                        '• Date formats accepted: YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, and others\n'
-                        '• Game type: "cash", "tournament", or "sit_and_go"\n'
-                        '• Choose Append to add rows on top of existing data, or Overwrite to replace everything',
+                        '• Only Date and Buy-in are required — everything else is optional\n'
+                        '• P&L is always calculated as Cash-out − Buy-in (no P&L column needed)\n'
+                        '• Duration can be in minutes or hours — both are recognised\n'
+                        '• CSV files with comma, semicolon, or tab delimiters are auto-detected\n'
+                        '• Excel files with multiple sheets: you\'ll be asked which sheet to use\n'
+                        '• Duplicate sessions (same date + buy-in) are skipped by default',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.outline,
                             ),

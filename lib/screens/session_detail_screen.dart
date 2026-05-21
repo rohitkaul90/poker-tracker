@@ -167,6 +167,8 @@ class SessionDetailScreen extends ConsumerWidget {
 
           if (session.location != null && session.location!.isNotEmpty)
             _Row(label: 'Location', value: session.location!),
+          if (session.country != null && session.country!.isNotEmpty)
+            _Row(label: 'Country', value: session.country!),
           if (session.notes != null && session.notes!.isNotEmpty)
             _Row(label: 'Notes', value: session.notes!),
 

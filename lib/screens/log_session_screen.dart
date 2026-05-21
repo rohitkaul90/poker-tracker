@@ -9,7 +9,12 @@ import '../utils/helpers.dart';
 import '../widgets/star_rating_widget.dart';
 
 const _stakeOptions = ['1/2', '1/3', '2/5', '5/10', '10/20', '25/50', 'Other'];
-const _currencies = ['CAD', 'USD', 'GBP', 'EUR', 'AUD', 'NZD'];
+const _currencies = ['CAD', 'USD', 'GBP', 'EUR', 'AUD', 'NZD', 'INR'];
+const _countries = [
+  'Canada', 'USA', 'United Kingdom', 'Australia', 'New Zealand',
+  'India', 'France', 'Germany', 'Spain', 'Italy', 'Netherlands', 'Belgium',
+  'Czech Republic', 'Monaco', 'Online',
+];
 
 class LogSessionScreen extends ConsumerStatefulWidget {
   final Session? session;
@@ -40,6 +45,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
   String _locationName = '';
   PokerRoom? _selectedRoom;
   late String _currency;
+  String? _country;
   final _notesCtrl = TextEditingController();
   int? _tableQuality;
   bool _rakePresetLoaded = false;
@@ -90,6 +96,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
       _selectedRoom =
           kPokerRooms.where((r) => r.storageKey == s.location).firstOrNull;
       _currency = s.currency;
+      _country = s.country;
       _notesCtrl.text = s.notes ?? '';
       _tableQuality = s.tableQuality;
       _livePL = s.profitLoss;
@@ -160,6 +167,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
       _locationName = name;
       if (room != null) {
         _currency = room.currency;
+        _country = room.country;
         if (room.isOnline) {
           if (_handsPerHourCtrl.text == '25') _handsPerHourCtrl.clear();
         } else if (_handsPerHourCtrl.text.isEmpty) {
@@ -297,6 +305,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
         tableQuality: tqVal,
         currency: Value(_currency),
         handsPerHour: hphVal,
+        country: Value(_country),
       ));
     } else {
       await db.updateSession(s.copyWith(
@@ -319,6 +328,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
         tableQuality: tqVal,
         currency: _currency,
         handsPerHour: hphVal,
+        country: Value(_country),
       ));
     }
 
@@ -391,6 +401,27 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
                       : theme.textTheme.bodyMedium,
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+
+            // Country (auto-filled from location, overridable)
+            DropdownButtonFormField<String?>(
+              key: ValueKey(_country),
+              initialValue: _countries.contains(_country) ? _country : null,
+              decoration: const InputDecoration(
+                labelText: 'Country',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Not specified',
+                      style: TextStyle(color: Colors.white38)),
+                ),
+                ..._countries.map((c) =>
+                    DropdownMenuItem<String?>(value: c, child: Text(c))),
+              ],
+              onChanged: (v) => setState(() => _country = v),
             ),
             const SizedBox(height: 16),
 

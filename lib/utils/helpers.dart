@@ -38,8 +38,44 @@ String currencySymbol(String currency) {
       return 'A\$';
     case 'NZD':
       return 'NZ\$';
+    case 'INR':
+      return '₹';
     default:
       return '\$';
+  }
+}
+
+String? currencyFromCountry(String? country) {
+  if (country == null || country.isEmpty) return null;
+  switch (country.toLowerCase()) {
+    case 'canada':
+      return 'CAD';
+    case 'usa':
+    case 'united states':
+    case 'us':
+    case 'online':
+      return 'USD';
+    case 'united kingdom':
+    case 'uk':
+      return 'GBP';
+    case 'australia':
+      return 'AUD';
+    case 'new zealand':
+      return 'NZD';
+    case 'india':
+      return 'INR';
+    case 'france':
+    case 'germany':
+    case 'spain':
+    case 'italy':
+    case 'netherlands':
+    case 'belgium':
+    case 'czech republic':
+    case 'monaco':
+    case 'europe':
+      return 'EUR';
+    default:
+      return null;
   }
 }
 

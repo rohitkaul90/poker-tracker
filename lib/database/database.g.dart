@@ -224,6 +224,17 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _countryMeta = const VerificationMeta(
+    'country',
+  );
+  @override
+  late final GeneratedColumn<String> country = GeneratedColumn<String>(
+    'country',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -246,6 +257,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     tableQuality,
     currency,
     handsPerHour,
+    country,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -409,6 +421,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         ),
       );
     }
+    if (data.containsKey('country')) {
+      context.handle(
+        _countryMeta,
+        country.isAcceptableOrUnknown(data['country']!, _countryMeta),
+      );
+    }
     return context;
   }
 
@@ -498,6 +516,10 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         DriftSqlType.int,
         data['${effectivePrefix}hands_per_hour'],
       ),
+      country: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}country'],
+      ),
     );
   }
 
@@ -528,6 +550,7 @@ class Session extends DataClass implements Insertable<Session> {
   final int? tableQuality;
   final String currency;
   final int? handsPerHour;
+  final String? country;
   const Session({
     required this.id,
     required this.date,
@@ -549,6 +572,7 @@ class Session extends DataClass implements Insertable<Session> {
     this.tableQuality,
     required this.currency,
     this.handsPerHour,
+    this.country,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -588,6 +612,9 @@ class Session extends DataClass implements Insertable<Session> {
     map['currency'] = Variable<String>(currency);
     if (!nullToAbsent || handsPerHour != null) {
       map['hands_per_hour'] = Variable<int>(handsPerHour);
+    }
+    if (!nullToAbsent || country != null) {
+      map['country'] = Variable<String>(country);
     }
     return map;
   }
@@ -630,6 +657,9 @@ class Session extends DataClass implements Insertable<Session> {
       handsPerHour: handsPerHour == null && nullToAbsent
           ? const Value.absent()
           : Value(handsPerHour),
+      country: country == null && nullToAbsent
+          ? const Value.absent()
+          : Value(country),
     );
   }
 
@@ -659,6 +689,7 @@ class Session extends DataClass implements Insertable<Session> {
       tableQuality: serializer.fromJson<int?>(json['tableQuality']),
       currency: serializer.fromJson<String>(json['currency']),
       handsPerHour: serializer.fromJson<int?>(json['handsPerHour']),
+      country: serializer.fromJson<String?>(json['country']),
     );
   }
   @override
@@ -685,6 +716,7 @@ class Session extends DataClass implements Insertable<Session> {
       'tableQuality': serializer.toJson<int?>(tableQuality),
       'currency': serializer.toJson<String>(currency),
       'handsPerHour': serializer.toJson<int?>(handsPerHour),
+      'country': serializer.toJson<String?>(country),
     };
   }
 
@@ -709,6 +741,7 @@ class Session extends DataClass implements Insertable<Session> {
     Value<int?> tableQuality = const Value.absent(),
     String? currency,
     Value<int?> handsPerHour = const Value.absent(),
+    Value<String?> country = const Value.absent(),
   }) => Session(
     id: id ?? this.id,
     date: date ?? this.date,
@@ -734,6 +767,7 @@ class Session extends DataClass implements Insertable<Session> {
     tableQuality: tableQuality.present ? tableQuality.value : this.tableQuality,
     currency: currency ?? this.currency,
     handsPerHour: handsPerHour.present ? handsPerHour.value : this.handsPerHour,
+    country: country.present ? country.value : this.country,
   );
   Session copyWithCompanion(SessionsCompanion data) {
     return Session(
@@ -769,6 +803,7 @@ class Session extends DataClass implements Insertable<Session> {
       handsPerHour: data.handsPerHour.present
           ? data.handsPerHour.value
           : this.handsPerHour,
+      country: data.country.present ? data.country.value : this.country,
     );
   }
 
@@ -794,13 +829,14 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('prizeWon: $prizeWon, ')
           ..write('tableQuality: $tableQuality, ')
           ..write('currency: $currency, ')
-          ..write('handsPerHour: $handsPerHour')
+          ..write('handsPerHour: $handsPerHour, ')
+          ..write('country: $country')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     date,
     stakes,
@@ -821,7 +857,8 @@ class Session extends DataClass implements Insertable<Session> {
     tableQuality,
     currency,
     handsPerHour,
-  );
+    country,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -845,7 +882,8 @@ class Session extends DataClass implements Insertable<Session> {
           other.prizeWon == this.prizeWon &&
           other.tableQuality == this.tableQuality &&
           other.currency == this.currency &&
-          other.handsPerHour == this.handsPerHour);
+          other.handsPerHour == this.handsPerHour &&
+          other.country == this.country);
 }
 
 class SessionsCompanion extends UpdateCompanion<Session> {
@@ -869,6 +907,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<int?> tableQuality;
   final Value<String> currency;
   final Value<int?> handsPerHour;
+  final Value<String?> country;
   const SessionsCompanion({
     this.id = const Value.absent(),
     this.date = const Value.absent(),
@@ -890,6 +929,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.tableQuality = const Value.absent(),
     this.currency = const Value.absent(),
     this.handsPerHour = const Value.absent(),
+    this.country = const Value.absent(),
   });
   SessionsCompanion.insert({
     this.id = const Value.absent(),
@@ -912,6 +952,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.tableQuality = const Value.absent(),
     this.currency = const Value.absent(),
     this.handsPerHour = const Value.absent(),
+    this.country = const Value.absent(),
   }) : date = Value(date),
        stakes = Value(stakes),
        buyIn = Value(buyIn),
@@ -942,6 +983,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<int>? tableQuality,
     Expression<String>? currency,
     Expression<int>? handsPerHour,
+    Expression<String>? country,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -964,6 +1006,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (tableQuality != null) 'table_quality': tableQuality,
       if (currency != null) 'currency': currency,
       if (handsPerHour != null) 'hands_per_hour': handsPerHour,
+      if (country != null) 'country': country,
     });
   }
 
@@ -988,6 +1031,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Value<int?>? tableQuality,
     Value<String>? currency,
     Value<int?>? handsPerHour,
+    Value<String?>? country,
   }) {
     return SessionsCompanion(
       id: id ?? this.id,
@@ -1010,6 +1054,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       tableQuality: tableQuality ?? this.tableQuality,
       currency: currency ?? this.currency,
       handsPerHour: handsPerHour ?? this.handsPerHour,
+      country: country ?? this.country,
     );
   }
 
@@ -1076,6 +1121,9 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (handsPerHour.present) {
       map['hands_per_hour'] = Variable<int>(handsPerHour.value);
     }
+    if (country.present) {
+      map['country'] = Variable<String>(country.value);
+    }
     return map;
   }
 
@@ -1101,7 +1149,8 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('prizeWon: $prizeWon, ')
           ..write('tableQuality: $tableQuality, ')
           ..write('currency: $currency, ')
-          ..write('handsPerHour: $handsPerHour')
+          ..write('handsPerHour: $handsPerHour, ')
+          ..write('country: $country')
           ..write(')'))
         .toString();
   }
@@ -1493,6 +1542,7 @@ typedef $$SessionsTableCreateCompanionBuilder =
       Value<int?> tableQuality,
       Value<String> currency,
       Value<int?> handsPerHour,
+      Value<String?> country,
     });
 typedef $$SessionsTableUpdateCompanionBuilder =
     SessionsCompanion Function({
@@ -1516,6 +1566,7 @@ typedef $$SessionsTableUpdateCompanionBuilder =
       Value<int?> tableQuality,
       Value<String> currency,
       Value<int?> handsPerHour,
+      Value<String?> country,
     });
 
 class $$SessionsTableFilterComposer
@@ -1624,6 +1675,11 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<int> get handsPerHour => $composableBuilder(
     column: $table.handsPerHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get country => $composableBuilder(
+    column: $table.country,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1736,6 +1792,11 @@ class $$SessionsTableOrderingComposer
     column: $table.handsPerHour,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get country => $composableBuilder(
+    column: $table.country,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SessionsTableAnnotationComposer
@@ -1818,6 +1879,9 @@ class $$SessionsTableAnnotationComposer
     column: $table.handsPerHour,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get country =>
+      $composableBuilder(column: $table.country, builder: (column) => column);
 }
 
 class $$SessionsTableTableManager
@@ -1868,6 +1932,7 @@ class $$SessionsTableTableManager
                 Value<int?> tableQuality = const Value.absent(),
                 Value<String> currency = const Value.absent(),
                 Value<int?> handsPerHour = const Value.absent(),
+                Value<String?> country = const Value.absent(),
               }) => SessionsCompanion(
                 id: id,
                 date: date,
@@ -1889,6 +1954,7 @@ class $$SessionsTableTableManager
                 tableQuality: tableQuality,
                 currency: currency,
                 handsPerHour: handsPerHour,
+                country: country,
               ),
           createCompanionCallback:
               ({
@@ -1912,6 +1978,7 @@ class $$SessionsTableTableManager
                 Value<int?> tableQuality = const Value.absent(),
                 Value<String> currency = const Value.absent(),
                 Value<int?> handsPerHour = const Value.absent(),
+                Value<String?> country = const Value.absent(),
               }) => SessionsCompanion.insert(
                 id: id,
                 date: date,
@@ -1933,6 +2000,7 @@ class $$SessionsTableTableManager
                 tableQuality: tableQuality,
                 currency: currency,
                 handsPerHour: handsPerHour,
+                country: country,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

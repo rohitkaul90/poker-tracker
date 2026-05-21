@@ -27,6 +27,8 @@ class Sessions extends Table {
   // v3 columns
   TextColumn get currency => text().withDefault(const Constant('CAD'))();
   IntColumn get handsPerHour => integer().nullable()();
+  // v4 columns
+  TextColumn get country => text().nullable()();
 }
 
 class RakePresets extends Table {
@@ -97,7 +99,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(createDatabaseConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,6 +115,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(sessions, sessions.currency);
             await m.addColumn(sessions, sessions.handsPerHour);
             await m.createTable(rakePresets);
+          }
+          if (from < 4) {
+            await m.addColumn(sessions, sessions.country);
           }
         },
       );
