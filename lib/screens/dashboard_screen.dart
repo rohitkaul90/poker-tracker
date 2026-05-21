@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
 import '../widgets/stat_card.dart';
@@ -56,7 +56,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 MaterialPageRoute(builder: (_) => const LogSessionScreen()),
               ),
               icon: const Icon(Icons.add),
-              label: const Text('Log Session'),
+              label: const Text('Log SessionModel'),
             )
           : null,
       body: TabBarView(
@@ -85,7 +85,7 @@ class _OverviewTab extends ConsumerWidget {
 }
 
 class _OverviewBody extends StatefulWidget {
-  final List<Session> sessions;
+  final List<SessionModel> sessions;
 
   const _OverviewBody({required this.sessions});
 
@@ -112,7 +112,7 @@ class _OverviewBodyState extends State<_OverviewBody> {
       _currencyFilter ??
       (_allCurrencies.isNotEmpty ? _allCurrencies.first : 'USD');
 
-  List<Session> get _byCurrency =>
+  List<SessionModel> get _byCurrency =>
       widget.sessions.where((s) => s.currency == _effectiveCurrency).toList();
 
   bool get _hasCash => _byCurrency.any((s) => s.gameType == 'cash');
@@ -120,7 +120,7 @@ class _OverviewBodyState extends State<_OverviewBody> {
       widget.sessions.any((s) => isTournamentType(s.gameType));
   bool get _showGameFilter => _hasCash && _hasTournament;
 
-  List<Session> get _filtered {
+  List<SessionModel> get _filtered {
     if (_gameFilter == null) return _byCurrency;
     if (_gameFilter == 'tournament') {
       return _byCurrency.where((s) => isTournamentType(s.gameType)).toList();
@@ -203,7 +203,7 @@ class _OverviewBodyState extends State<_OverviewBody> {
           children: _gameFilter == 'tournament'
               ? [
                   StatCard(
-                    label: 'Sessions',
+                    label: 'SessionModels',
                     value: '${stats.sessionCount}',
                   ),
                   StatCard(
@@ -232,7 +232,7 @@ class _OverviewBodyState extends State<_OverviewBody> {
                         stats.hourlyRate >= 0 ? Colors.green : Colors.red,
                   ),
                   StatCard(
-                    label: 'Sessions',
+                    label: 'SessionModels',
                     value: '${stats.sessionCount}',
                   ),
                   StatCard(
@@ -250,7 +250,7 @@ class _OverviewBodyState extends State<_OverviewBody> {
 
         // Recent sessions
         if (recent.isNotEmpty) ...[
-          Text('Recent Sessions',
+          Text('Recent SessionModels',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           ...recent.map(
@@ -372,7 +372,7 @@ class _Stats {
     required this.roi,
   });
 
-  factory _Stats.from(List<Session> sessions, String currency) {
+  factory _Stats.from(List<SessionModel> sessions, String currency) {
     if (sessions.isEmpty) {
       return _Stats(
         totalPL: 0, totalHours: 0, hourlyRate: 0, sessionCount: 0,

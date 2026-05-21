@@ -1,9 +1,7 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../data/poker_rooms.dart';
-import '../database/database.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
 
@@ -325,7 +323,7 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
     });
 
     try {
-      final db = ref.read(databaseProvider);
+      final service = ref.read(supabaseServiceProvider);
       final headers = widget.fileHeaders;
       int colIdx(String? col) => col == null ? -1 : headers.indexOf(col);
 
@@ -352,13 +350,13 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
       // Load existing sessions for duplicate detection
       Set<String>? existingKeys;
       if (_skipDuplicates && !_overwrite) {
-        final existing = await db.watchAllSessions().first;
+        final existing = await service.watchAllSessions().first;
         existingKeys = existing
             .map((s) => '${s.date}_${s.buyIn.toStringAsFixed(2)}')
             .toSet();
       }
 
-      final sessions = <SessionsCompanion>[];
+      final sessions = <Map<String, dynamic>>[];
 
       for (final row in widget.rows) {
         if (row.isEmpty) continue;
@@ -518,42 +516,38 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
             ? int.tryParse(cell(hphIdx))
             : null;
 
-        sessions.add(SessionsCompanion.insert(
-          date: dateStr,
-          stakes: stakes,
-          gameType: Value(gameType),
-          buyIn: buyIn,
-          cashOut: cashOut,
-          profitLoss: pl,
-          startTime: startTime,
-          endTime: endTime,
-          durationMinutes: durationMinutes,
-          currency: Value(currency),
-          location: Value(location),
-          notes: Value(notes),
-          createdAt: DateTime.now().toIso8601String(),
-          rakePaid: Value(rake),
-          finishPosition: Value(fp),
-          totalEntrants: Value(te),
-          prizeWon: prizeWonIdx >= 0
-              ? Value(prizeWonRaw)
-              : (isTournamentType(gameType) && cashOutRaw != null
-                  ? Value(cashOutRaw)
-                  : const Value(null)),
-          tableQuality: Value(tq),
-          handsPerHour: Value(hph),
-          country: Value(country),
-        ));
+        sessions.add({
+          'date': dateStr,
+          'stakes': stakes,
+          'game_type': gameType,
+          'buy_in': buyIn,
+          'cash_out': cashOut,
+          'profit_loss': pl,
+          'start_time': startTime,
+          'end_time': endTime,
+          'duration_minutes': durationMinutes,
+          'currency': currency,
+          'location': location,
+          'notes': notes,
+          'created_at': DateTime.now().toIso8601String(),
+          'rake_paid': rake,
+          'finish_position': fp,
+          'total_entrants': te,
+          'prize_won': prizeWonIdx >= 0
+              ? prizeWonRaw
+              : (isTournamentType(gameType) ? cashOutRaw : null),
+          'table_quality': tq,
+          'hands_per_hour': hph,
+          'country': country,
+        });
       }
 
       if (sessions.isEmpty) {
         throw Exception('No valid rows found to import.');
       }
 
-      if (_overwrite) await db.clearAllSessions();
-      for (final s in sessions) {
-        await db.insertSession(s);
-      }
+      if (_overwrite) await service.clearAllSessions();
+      await service.bulkInsertSessions(sessions);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

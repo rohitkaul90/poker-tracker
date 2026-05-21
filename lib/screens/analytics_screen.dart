@@ -2,7 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/poker_rooms.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
 
@@ -34,7 +34,7 @@ class AnalyticsScreen extends ConsumerWidget {
 }
 
 class _AnalyticsBody extends StatefulWidget {
-  final List<Session> sessions;
+  final List<SessionModel> sessions;
 
   const _AnalyticsBody({required this.sessions});
 
@@ -47,7 +47,7 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
   String? _venueFilter;    // null | 'live' | 'online'
   String? _currencyFilter; // null | 'CAD' | 'USD' | ...
 
-  List<Session> get _filtered {
+  List<SessionModel> get _filtered {
     var result = widget.sessions;
     if (_gameFilter != null) {
       if (_gameFilter == 'tournament') {
@@ -67,7 +67,7 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
     return result;
   }
 
-  List<Session> get _sorted =>
+  List<SessionModel> get _sorted =>
       [..._filtered]..sort((a, b) => a.date.compareTo(b.date));
 
   bool get _hasCash => widget.sessions.any((s) => s.gameType == 'cash');
@@ -239,7 +239,7 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
           ),
           const SizedBox(height: 8),
           _InsightCard(
-            title: 'By Session Length',
+            title: 'By SessionModel Length',
             sessions: filtered,
             keyFn: (s) => sessionLengthBucket(s.durationMinutes),
             orderedKeys: const [
@@ -291,7 +291,7 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
     );
   }
 
-  bool _hasMultipleLocations(List<Session> sessions) {
+  bool _hasMultipleLocations(List<SessionModel> sessions) {
     final locs = sessions
         .map((s) => s.location)
         .whereType<String>()
@@ -422,7 +422,7 @@ class _CurrencyFilterChips extends StatelessWidget {
 // ─── Summary Stats Card ───────────────────────────────────────────────────────
 
 class _StatsCard extends StatelessWidget {
-  final List<Session> sessions;
+  final List<SessionModel> sessions;
 
   const _StatsCard({required this.sessions});
 
@@ -437,19 +437,19 @@ class _StatsCard extends StatelessWidget {
     final totalHours =
         sessions.fold(0, (s, e) => s + e.durationMinutes) / 60.0;
 
-    final tSessions =
+    final tSessionModels =
         sessions.where((s) => isTournamentType(s.gameType)).toList();
-    final hasTournaments = tSessions.isNotEmpty;
+    final hasTournaments = tSessionModels.isNotEmpty;
     final avgROI = hasTournaments
-        ? tSessions.fold(
+        ? tSessionModels.fold(
                 0.0,
                 (sum, s) =>
                     sum +
                     (s.buyIn > 0 ? s.profitLoss / s.buyIn * 100 : 0.0)) /
-            tSessions.length
+            tSessionModels.length
         : null;
     final itm = hasTournaments
-        ? tSessions.where((s) => (s.prizeWon ?? 0) > 0).length
+        ? tSessionModels.where((s) => (s.prizeWon ?? 0) > 0).length
         : null;
 
     return Card(
@@ -472,7 +472,7 @@ class _StatsCard extends StatelessWidget {
                 spacing: 24,
                 runSpacing: 12,
                 children: [
-                  _StatItem(label: 'Sessions', value: '$count'),
+                  _StatItem(label: 'SessionModels', value: '$count'),
                   _StatItem(
                       label: 'Hours',
                       value: '${totalHours.toStringAsFixed(1)}h'),
@@ -482,11 +482,11 @@ class _StatsCard extends StatelessWidget {
                       value: formatROI(avgROI),
                       valueColor: avgROI >= 0 ? Colors.green : Colors.red,
                     ),
-                  if (itm != null && tSessions.isNotEmpty)
+                  if (itm != null && tSessionModels.isNotEmpty)
                     _StatItem(
                       label: 'ITM',
                       value:
-                          '${(itm / tSessions.length * 100).toStringAsFixed(0)}%',
+                          '${(itm / tSessionModels.length * 100).toStringAsFixed(0)}%',
                     ),
                 ],
               ),
@@ -577,7 +577,7 @@ class _StatsCard extends StatelessWidget {
                   spacing: 24,
                   runSpacing: 12,
                   children: [
-                    _StatItem(label: 'Sessions', value: '$count'),
+                    _StatItem(label: 'SessionModels', value: '$count'),
                     _StatItem(
                         label: 'Hours',
                         value: '${totalHours.toStringAsFixed(1)}h'),
@@ -602,11 +602,11 @@ class _StatsCard extends StatelessWidget {
                         valueColor:
                             avgROI >= 0 ? Colors.green : Colors.red,
                       ),
-                    if (itm != null && tSessions.isNotEmpty)
+                    if (itm != null && tSessionModels.isNotEmpty)
                       _StatItem(
                         label: 'ITM',
                         value:
-                            '${(itm / tSessions.length * 100).toStringAsFixed(0)}%',
+                            '${(itm / tSessionModels.length * 100).toStringAsFixed(0)}%',
                       ),
                   ],
                 );
@@ -655,7 +655,7 @@ class _StatItem extends StatelessWidget {
 enum _PLMode { cumulative, monthly, yearly }
 
 class _PLChart extends StatefulWidget {
-  final List<Session> sessions;
+  final List<SessionModel> sessions;
   final String? currencyFilter;
 
   const _PLChart({required this.sessions, this.currencyFilter});
@@ -728,7 +728,7 @@ class _PLChartState extends State<_PLChart> {
                           size: 32),
                       const SizedBox(height: 8),
                       Text(
-                        'Sessions use multiple currencies.',
+                        'SessionModels use multiple currencies.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.outline,
                             ),
@@ -981,7 +981,7 @@ class _PLChartState extends State<_PLChart> {
 enum _WRAttr { timeOfDay, dayOfWeek, sessionLength, tableQuality, location, liveVsOnline }
 
 class _WinRateByAttributeChart extends StatefulWidget {
-  final List<Session> sessions;
+  final List<SessionModel> sessions;
   final bool hasLiveAndOnline;
 
   const _WinRateByAttributeChart({
@@ -1011,7 +1011,7 @@ class _WinRateByAttributeChartState
   }
 
   // Returns (groupKey, orderedKeys, shortLabelFn)
-  (String? Function(Session), List<String>?, String Function(String))
+  (String? Function(SessionModel), List<String>?, String Function(String))
       _attrConfig() {
     switch (_attr) {
       case _WRAttr.timeOfDay:
@@ -1084,7 +1084,7 @@ class _WinRateByAttributeChartState
     final attrLabels = {
       _WRAttr.timeOfDay: 'Time of Day',
       _WRAttr.dayOfWeek: 'Day of Week',
-      _WRAttr.sessionLength: 'Session Length',
+      _WRAttr.sessionLength: 'SessionModel Length',
       _WRAttr.tableQuality: 'Table Quality',
       _WRAttr.location: 'Location',
       _WRAttr.liveVsOnline: 'Live vs Online',
@@ -1198,7 +1198,7 @@ class _WinRateByAttributeChartState
                 if (isMultiCurrency)
                   Tooltip(
                     message:
-                        'Sessions use multiple currencies — \$/hr values are not directly comparable. Filter by currency for accurate comparison.',
+                        'SessionModels use multiple currencies — \$/hr values are not directly comparable. Filter by currency for accurate comparison.',
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1318,7 +1318,7 @@ class _GroupStats {
     required this.totalHours,
   });
 
-  factory _GroupStats.from(List<Session> sessions) {
+  factory _GroupStats.from(List<SessionModel> sessions) {
     final total = sessions.fold(0.0, (s, e) => s + e.profitLoss);
     final totalMinutes = sessions.fold(0, (s, e) => s + e.durationMinutes);
     final hours = totalMinutes / 60.0;
@@ -1334,8 +1334,8 @@ class _GroupStats {
 
 class _InsightCard extends StatelessWidget {
   final String title;
-  final List<Session> sessions;
-  final String Function(Session) keyFn;
+  final List<SessionModel> sessions;
+  final String Function(SessionModel) keyFn;
   final List<String>? orderedKeys;
 
   const _InsightCard({
@@ -1347,7 +1347,7 @@ class _InsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final groups = <String, List<Session>>{};
+    final groups = <String, List<SessionModel>>{};
     for (final s in sessions) {
       groups.putIfAbsent(keyFn(s), () => []).add(s);
     }
@@ -1530,7 +1530,7 @@ class _Rec {
 }
 
 class _RecommendationsCard extends StatelessWidget {
-  final List<Session> sessions;
+  final List<SessionModel> sessions;
   final String typeLabel;
 
   const _RecommendationsCard({
@@ -1589,7 +1589,7 @@ class _RecommendationsCard extends StatelessWidget {
     final overallRate = overallHours > 0 ? overallPL / overallHours : 0.0;
 
     void checkGroups({
-      required String? Function(Session) keyFn,
+      required String? Function(SessionModel) keyFn,
       required IconData icon,
       required String dimension,
       bool cashOnly = false,

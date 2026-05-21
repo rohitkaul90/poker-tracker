@@ -1,29 +1,48 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
+import '../models/session_filter.dart';
+import '../services/supabase_service.dart';
 
-final databaseProvider = Provider<AppDatabase>((ref) {
-  final db = AppDatabase();
-  ref.onDispose(db.close);
-  return db;
+export '../models/session_filter.dart' show SessionFilter, SessionResult;
+
+final supabaseServiceProvider = Provider<SupabaseService>((ref) {
+  return SupabaseService();
 });
 
-final sessionsProvider = StreamProvider<List<Session>>((ref) {
-  return ref.watch(databaseProvider).watchAllSessions();
+final sessionsProvider = StreamProvider<List<SessionModel>>((ref) {
+  return ref.watch(supabaseServiceProvider).watchAllSessions();
 });
 
 final filterProvider = StateProvider<SessionFilter>((ref) => const SessionFilter());
 
-final filteredSessionsProvider = StreamProvider<List<Session>>((ref) {
+final filteredSessionsProvider = Provider<AsyncValue<List<SessionModel>>>((ref) {
   final filter = ref.watch(filterProvider);
-  final db = ref.watch(databaseProvider);
-  if (filter.isEmpty) return db.watchAllSessions();
-  return db.watchFilteredSessions(filter);
+  final sessionsAsync = ref.watch(sessionsProvider);
+  if (filter.isEmpty) return sessionsAsync;
+  return sessionsAsync.whenData(
+    (sessions) => sessions.where(filter.matches).toList(),
+  );
 });
 
-final distinctStakesProvider = FutureProvider<List<String>>((ref) {
-  return ref.watch(databaseProvider).getDistinctStakes();
+final distinctStakesProvider = Provider<AsyncValue<List<String>>>((ref) {
+  return ref.watch(sessionsProvider).whenData(
+    (sessions) => sessions
+        .map((s) => s.stakes)
+        .where((s) => s != 'N/A')
+        .toSet()
+        .toList()
+      ..sort(),
+  );
 });
 
-final distinctLocationsProvider = FutureProvider<List<String>>((ref) {
-  return ref.watch(databaseProvider).getDistinctLocations();
+final distinctLocationsProvider = Provider<AsyncValue<List<String>>>((ref) {
+  return ref.watch(sessionsProvider).whenData(
+    (sessions) => sessions
+        .map((s) => s.location)
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort(),
+  );
 });

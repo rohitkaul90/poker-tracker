@@ -8,7 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
 import '../providers/providers.dart';
 import 'import_mapping_screen.dart';
 
@@ -44,7 +44,7 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
         'table_quality',
       ];
 
-  List<dynamic> _sessionToRow(Session s) => [
+  List<dynamic> _sessionToRow(SessionModel s) => [
         s.date,
         s.gameType,
         s.stakes,
@@ -66,7 +66,7 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
   Future<void> _exportCsv() async {
     setState(() => _busy = true);
     try {
-      final sessions = await ref.read(databaseProvider).watchAllSessions().first;
+      final sessions = await ref.read(supabaseServiceProvider).watchAllSessions().first;
       if (sessions.isEmpty) {
         _showSnack('No sessions to export.');
         return;
@@ -97,7 +97,7 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
   Future<void> _exportExcel() async {
     setState(() => _busy = true);
     try {
-      final sessions = await ref.read(databaseProvider).watchAllSessions().first;
+      final sessions = await ref.read(supabaseServiceProvider).watchAllSessions().first;
       if (sessions.isEmpty) {
         _showSnack('No sessions to export.');
         return;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../widgets/session_tile.dart';
 import 'log_session_screen.dart';
@@ -168,7 +168,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             // Stakes
             stakesAsync.when(
               loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
+              error: (e, st) => const SizedBox.shrink(),
               data: (stakes) {
                 if (stakes.isEmpty) return const SizedBox.shrink();
                 return Column(
@@ -198,7 +198,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             // Location
             locationsAsync.when(
               loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
+              error: (e, st) => const SizedBox.shrink(),
               data: (locs) {
                 if (locs.isEmpty) return const SizedBox.shrink();
                 return Column(
@@ -350,12 +350,12 @@ class _DateButton extends StatelessWidget {
 }
 
 class _SessionList extends StatelessWidget {
-  final List<Session> sessions;
+  final List<SessionModel> sessions;
 
   const _SessionList({required this.sessions});
 
-  Map<String, List<Session>> _groupByMonth() {
-    final map = <String, List<Session>>{};
+  Map<String, List<SessionModel>> _groupByMonth() {
+    final map = <String, List<SessionModel>>{};
     for (final s in sessions) {
       final key = DateFormat('MMMM yyyy').format(DateTime.parse(s.date));
       map.putIfAbsent(key, () => []).add(s);

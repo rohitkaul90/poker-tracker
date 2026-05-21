@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth/auth_gate.dart';
+import 'config/supabase_config.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/session_history_screen.dart';
+import 'screens/settings_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
   runApp(const ProviderScope(child: PokerTrackerApp()));
 }
 
@@ -22,7 +31,7 @@ class PokerTrackerApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const MainNavigation(),
+      home: const AuthGate(),
     );
   }
 }
@@ -45,6 +54,7 @@ class _MainNavigationState extends State<MainNavigation> {
         children: const [
           DashboardScreen(),
           SessionHistoryScreen(),
+          SettingsScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -60,6 +70,11 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.list_outlined),
             selectedIcon: Icon(Icons.list),
             label: 'Sessions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),

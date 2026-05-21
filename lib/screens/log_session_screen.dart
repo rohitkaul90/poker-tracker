@@ -1,9 +1,8 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../data/poker_rooms.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
 import '../widgets/star_rating_widget.dart';
@@ -17,7 +16,7 @@ const _countries = [
 ];
 
 class LogSessionScreen extends ConsumerStatefulWidget {
-  final Session? session;
+  final SessionModel? session;
 
   const LogSessionScreen({super.key, this.session});
 
@@ -65,8 +64,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
     final s = widget.session;
     if (s != null) {
       _date = DateTime.parse(s.date);
-      _gameType =
-          (s.gameType == 'sit_and_go') ? 'tournament' : s.gameType;
+      _gameType = (s.gameType == 'sit_and_go') ? 'tournament' : s.gameType;
       final existingStake = s.stakes;
       _isCustomStake =
           !_stakeOptions.contains(existingStake) && existingStake != 'N/A';
@@ -182,11 +180,12 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
     if (_locationName.isEmpty) return;
     final stakes =
         _isTournament ? 'N/A' : (_isCustomStake ? _customStakeCtrl.text.trim() : _selectedStake);
-    final preset =
-        await ref.read(databaseProvider).getRakePreset(_locationName, _gameType, stakes);
+    final preset = await ref
+        .read(supabaseServiceProvider)
+        .getRakePreset(_locationName, _gameType, stakes);
     if (preset != null && mounted) {
       setState(() {
-        _rakeCtrl.text = preset.rakeAmount.toStringAsFixed(0);
+        _rakeCtrl.text = (preset['rake_amount'] as num).toStringAsFixed(0);
         _rakePresetLoaded = true;
       });
     } else if (mounted) {
@@ -245,91 +244,55 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
 
     double cashOut;
     double pl;
-    Value<double?> prizeWonVal = const Value(null);
+    double? prizeWon;
     if (_isTournament) {
-      final prizeWon = double.tryParse(_prizeWonCtrl.text) ?? 0;
+      prizeWon = double.tryParse(_prizeWonCtrl.text) ?? 0;
       cashOut = prizeWon;
       pl = prizeWon - buyIn;
-      prizeWonVal = Value(prizeWon);
     } else {
       cashOut = double.parse(_cashOutCtrl.text);
       pl = cashOut - buyIn;
     }
 
     final rakeText = _rakeCtrl.text.trim();
-    final double? rakeValue =
-        rakeText.isEmpty ? null : double.tryParse(rakeText);
-    final Value<double?> rakeVal = Value(rakeValue);
-
+    final double? rakeValue = rakeText.isEmpty ? null : double.tryParse(rakeText);
     final fpText = _finishPositionCtrl.text.trim();
-    final Value<int?> fpVal =
-        fpText.isEmpty ? const Value(null) : Value(int.tryParse(fpText));
-
     final teText = _totalEntrantsCtrl.text.trim();
-    final Value<int?> teVal =
-        teText.isEmpty ? const Value(null) : Value(int.tryParse(teText));
-
-    final Value<int?> tqVal =
-        Value(_showTableQuality ? _tableQuality : null);
-
     final hphText = _handsPerHourCtrl.text.trim();
-    final Value<int?> hphVal =
-        hphText.isEmpty ? const Value(null) : Value(int.tryParse(hphText));
 
-    final db = ref.read(databaseProvider);
+    final service = ref.read(supabaseServiceProvider);
 
     if (rakeValue != null && _locationName.isNotEmpty) {
-      await db.upsertRakePreset(_locationName, _gameType, stakesVal, rakeValue);
+      await service.upsertRakePreset(_locationName, _gameType, stakesVal, rakeValue);
     }
 
-    final s = widget.session;
-    if (s == null) {
-      await db.insertSession(SessionsCompanion(
-        date: Value(dateStr),
-        stakes: Value(stakesVal),
-        gameType: Value(_gameType),
-        buyIn: Value(buyIn),
-        cashOut: Value(cashOut),
-        profitLoss: Value(pl),
-        startTime: Value(startStr),
-        endTime: Value(endStr),
-        durationMinutes: Value(dur),
-        location: Value(_locationName.isEmpty ? null : _locationName),
-        notes: Value(
-            _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim()),
-        createdAt: Value(now),
-        rakePaid: rakeVal,
-        finishPosition: fpVal,
-        totalEntrants: teVal,
-        prizeWon: prizeWonVal,
-        tableQuality: tqVal,
-        currency: Value(_currency),
-        handsPerHour: hphVal,
-        country: Value(_country),
-      ));
+    final data = {
+      'date': dateStr,
+      'stakes': stakesVal,
+      'game_type': _gameType,
+      'buy_in': buyIn,
+      'cash_out': cashOut,
+      'profit_loss': pl,
+      'start_time': startStr,
+      'end_time': endStr,
+      'duration_minutes': dur,
+      'location': _locationName.isEmpty ? null : _locationName,
+      'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      'created_at': now,
+      'rake_paid': rakeValue,
+      'finish_position': fpText.isEmpty ? null : int.tryParse(fpText),
+      'total_entrants': teText.isEmpty ? null : int.tryParse(teText),
+      'prize_won': _isTournament ? prizeWon : null,
+      'table_quality': _showTableQuality ? _tableQuality : null,
+      'currency': _currency,
+      'hands_per_hour': hphText.isEmpty ? null : int.tryParse(hphText),
+      'country': _country,
+    };
+
+    if (widget.session == null) {
+      await service.insertSession(data);
     } else {
-      await db.updateSession(s.copyWith(
-        date: dateStr,
-        stakes: stakesVal,
-        gameType: _gameType,
-        buyIn: buyIn,
-        cashOut: cashOut,
-        profitLoss: pl,
-        startTime: startStr,
-        endTime: endStr,
-        durationMinutes: dur,
-        location: Value(_locationName.isEmpty ? null : _locationName),
-        notes: Value(
-            _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim()),
-        rakePaid: rakeVal,
-        finishPosition: fpVal,
-        totalEntrants: teVal,
-        prizeWon: prizeWonVal,
-        tableQuality: tqVal,
-        currency: _currency,
-        handsPerHour: hphVal,
-        country: Value(_country),
-      ));
+      await service.updateSession(widget.session!.id, data);
     }
 
     if (mounted) Navigator.pop(context);
@@ -404,7 +367,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Country (auto-filled from location, overridable)
+            // Country
             DropdownButtonFormField<String?>(
               key: ValueKey(_country),
               initialValue: _countries.contains(_country) ? _country : null,

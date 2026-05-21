@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
 import 'log_session_screen.dart';
 
 class SessionDetailScreen extends ConsumerWidget {
-  final Session session;
+  final SessionModel session;
 
   const SessionDetailScreen({super.key, required this.session});
 
@@ -83,9 +83,8 @@ class SessionDetailScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          if (!isTournament || session.stakes != 'N/A')
-            if (!isTournament)
-              _Row(label: 'Stakes', value: session.stakes),
+          if (!isTournament)
+            _Row(label: 'Stakes', value: session.stakes),
 
           _Row(label: 'Buy-in', value: '$sym${session.buyIn.toStringAsFixed(0)}'),
 
@@ -207,7 +206,7 @@ class SessionDetailScreen extends ConsumerWidget {
       ),
     );
     if (confirmed == true && context.mounted) {
-      await ref.read(databaseProvider).deleteSession(session.id);
+      await ref.read(supabaseServiceProvider).deleteSession(session.id);
       if (context.mounted) Navigator.pop(context);
     }
   }

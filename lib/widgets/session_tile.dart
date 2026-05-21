@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../database/database.dart';
+import '../models/session_model.dart';
 import '../utils/helpers.dart';
 
 class SessionTile extends StatelessWidget {
-  final Session session;
+  final SessionModel session;
   final VoidCallback? onTap;
 
   const SessionTile({super.key, required this.session, this.onTap});
