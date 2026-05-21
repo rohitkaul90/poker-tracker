@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 int calcDurationMinutes(String startTime, String endTime) {
   final start = _timeToMinutes(startTime);
   final end = _timeToMinutes(endTime);
@@ -19,75 +21,48 @@ String formatDuration(int minutes) {
   return '${h}h ${m}m';
 }
 
-String formatPL(double amount) {
-  if (amount >= 0) return '+\$${amount.toStringAsFixed(0)}';
-  return '-\$${amount.abs().toStringAsFixed(0)}';
+final _numFmt = NumberFormat('#,##0', 'en_US');
+
+String formatPL(double amount, [String sym = '\$']) {
+  final abs = amount.abs().round();
+  return amount >= 0 ? '+$sym${_numFmt.format(abs)}' : '-$sym${_numFmt.format(abs)}';
 }
 
 String currencySymbol(String currency) {
   switch (currency) {
-    case 'USD':
-      return '\$';
-    case 'CAD':
-      return 'CA\$';
-    case 'GBP':
-      return '£';
-    case 'EUR':
-      return '€';
-    case 'AUD':
-      return 'A\$';
-    case 'NZD':
-      return 'NZ\$';
-    case 'INR':
-      return '₹';
-    default:
-      return '\$';
+    case 'USD': return '\$';
+    case 'CAD': return 'CA\$';
+    case 'GBP': return '£';
+    case 'EUR': return '€';
+    case 'AUD': return 'A\$';
+    case 'NZD': return 'NZ\$';
+    case 'INR': return '₹';
+    default: return '\$';
   }
 }
 
 String? currencyFromCountry(String? country) {
   if (country == null || country.isEmpty) return null;
   switch (country.toLowerCase()) {
-    case 'canada':
-      return 'CAD';
-    case 'usa':
-    case 'united states':
-    case 'us':
-    case 'online':
-      return 'USD';
-    case 'united kingdom':
-    case 'uk':
-      return 'GBP';
-    case 'australia':
-      return 'AUD';
-    case 'new zealand':
-      return 'NZD';
-    case 'india':
-      return 'INR';
-    case 'france':
-    case 'germany':
-    case 'spain':
-    case 'italy':
-    case 'netherlands':
-    case 'belgium':
-    case 'czech republic':
-    case 'monaco':
-    case 'europe':
-      return 'EUR';
-    default:
-      return null;
+    case 'canada': return 'CAD';
+    case 'usa': case 'united states': case 'us': case 'online': return 'USD';
+    case 'united kingdom': case 'uk': return 'GBP';
+    case 'australia': return 'AUD';
+    case 'new zealand': return 'NZD';
+    case 'india': return 'INR';
+    case 'france': case 'germany': case 'spain': case 'italy':
+    case 'netherlands': case 'belgium': case 'czech republic':
+    case 'monaco': case 'europe': return 'EUR';
+    default: return null;
   }
 }
 
 String formatAmount(double amount, String currency) {
-  return '${currencySymbol(currency)}${amount.toStringAsFixed(0)}';
+  return '${currencySymbol(currency)}${_numFmt.format(amount.round())}';
 }
 
-String formatPLWithCurrency(double amount, String currency) {
-  final sym = currencySymbol(currency);
-  if (amount >= 0) return '+$sym${amount.toStringAsFixed(0)}';
-  return '-$sym${amount.abs().toStringAsFixed(0)}';
-}
+String formatPLWithCurrency(double amount, String currency) =>
+    formatPL(amount, currencySymbol(currency));
 
 double calcROI(double profitLoss, double buyIn) {
   if (buyIn <= 0) return 0;
@@ -111,30 +86,20 @@ bool isTournamentType(String gameType) =>
 
 String gameTypeLabel(String gameType) {
   switch (gameType) {
-    case 'cash':
-      return 'Cash Game';
-    case 'tournament':
-    case 'sit_and_go':
-      return 'Tournament';
-    default:
-      return gameType;
+    case 'cash': return 'Cash Game';
+    case 'tournament': case 'sit_and_go': return 'Tournament';
+    default: return gameType;
   }
 }
 
 String tableQualityLabel(int? quality) {
   switch (quality) {
-    case 1:
-      return 'Very Tough';
-    case 2:
-      return 'Tough';
-    case 3:
-      return 'Average';
-    case 4:
-      return 'Soft';
-    case 5:
-      return 'Very Soft';
-    default:
-      return 'Not rated';
+    case 1: return 'Very Tough';
+    case 2: return 'Tough';
+    case 3: return 'Average';
+    case 4: return 'Soft';
+    case 5: return 'Very Soft';
+    default: return 'Not rated';
   }
 }
 
@@ -163,7 +128,32 @@ String monthLabel(String date) {
   final dt = DateTime.parse(date);
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   return '${months[dt.month - 1]} ${dt.year}';
 }
+
+// ─── Currency Conversion ──────────────────────────────────────────────────────
+
+// Approximate exchange rates (1 USD = X units). Updated May 2026.
+const Map<String, double> _ratesPerUsd = {
+  'USD': 1.0,
+  'CAD': 1.38,
+  'GBP': 0.78,
+  'EUR': 0.92,
+  'AUD': 1.59,
+  'NZD': 1.73,
+  'INR': 84.5,
+};
+
+/// Converts [amount] from [from] currency to [to] currency.
+double convertCurrency(double amount, String from, String to) {
+  if (from == to) return amount;
+  final fromRate = _ratesPerUsd[from] ?? 1.0;
+  final toRate = _ratesPerUsd[to] ?? 1.0;
+  return amount / fromRate * toRate;
+}
+
+/// All currencies supported for display conversion.
+final List<String> supportedDisplayCurrencies =
+    (_ratesPerUsd.keys.toList()..sort());
