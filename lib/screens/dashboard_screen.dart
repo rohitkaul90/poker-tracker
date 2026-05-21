@@ -172,11 +172,11 @@ class _OverviewBodyState extends State<_OverviewBody> {
         ),
         const SizedBox(height: 12),
 
-        // Stat cards grid
-        GridView.count(
+        // Stat cards grid — 4 columns on wide screens, 2 on mobile
+        LayoutBuilder(builder: (context, constraints) => GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
+          crossAxisCount: constraints.maxWidth > 520 ? 4 : 2,
           childAspectRatio: 2.0,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
@@ -185,25 +185,30 @@ class _OverviewBodyState extends State<_OverviewBody> {
                   StatCard(
                     label: 'Sessions',
                     value: '${stats.sessionCount}',
+                    accentColor: Colors.deepPurple,
                   ),
                   StatCard(
                     label: 'ITM',
                     value: '${stats.itm}',
+                    accentColor: Colors.teal,
                   ),
                   StatCard(
                     label: 'ITM %',
                     value: '${stats.itmPct.toStringAsFixed(0)}%',
+                    accentColor: Colors.cyan,
                   ),
                   StatCard(
                     label: 'ROI',
                     value: formatROI(stats.roi),
                     valueColor: stats.roi >= 0 ? Colors.green : Colors.red,
+                    accentColor: Colors.amber,
                   ),
                 ]
               : [
                   StatCard(
                     label: 'Hours Played',
-                    value: '${stats.totalHours.toStringAsFixed(1)}h',
+                    value: '${stats.totalHours.round()}h',
+                    accentColor: Colors.blue,
                   ),
                   StatCard(
                     label: 'Win Rate',
@@ -211,10 +216,12 @@ class _OverviewBodyState extends State<_OverviewBody> {
                         '${formatPLWithCurrency(stats.hourlyRate, displayCurrency)}/hr',
                     valueColor:
                         stats.hourlyRate >= 0 ? Colors.green : Colors.red,
+                    accentColor: Colors.teal,
                   ),
                   StatCard(
                     label: 'Sessions',
                     value: '${stats.sessionCount}',
+                    accentColor: Colors.deepPurple,
                   ),
                   StatCard(
                     label: 'W / L',
@@ -224,9 +231,10 @@ class _OverviewBodyState extends State<_OverviewBody> {
                         : stats.losses > stats.wins
                             ? Colors.red
                             : null,
+                    accentColor: Colors.orange,
                   ),
                 ],
-        ),
+        )),
         const SizedBox(height: 20),
 
         // Recent sessions

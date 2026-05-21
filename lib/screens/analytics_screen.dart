@@ -1061,15 +1061,7 @@ class _WinRateByAttributeChartState extends State<_WinRateByAttributeChart> {
         ..sort((a, b) => (groups[b]!.totalPL).compareTo(groups[a]!.totalPL));
     }
 
-    // P&L scale (left axis)
-    final plValues = keys.map((k) => groups[k]!.totalPL).toList();
-    final plMaxAbs =
-        plValues.map((v) => v.abs()).reduce((a, b) => a > b ? a : b);
-    final plEff = plMaxAbs < 1 ? 50.0 : plMaxAbs;
-    final plMinY = plValues.any((v) => v < 0) ? -(plEff * 1.35) : -(plEff * 0.1);
-    final plMaxY = plEff * 1.35;
-
-    // Win rate scale (right axis)
+    // Win rate scale
     final rateValues = keys.map((k) => hourlyRates[k]!).toList();
     final rateMaxAbs =
         rateValues.map((v) => v.abs()).reduce((a, b) => a > b ? a : b);
@@ -1086,21 +1078,6 @@ class _WinRateByAttributeChartState extends State<_WinRateByAttributeChart> {
                 ? 16.0
                 : 10.0;
 
-    // P&L bar groups
-    final plBarGroups = keys.asMap().entries.map((e) {
-      final pl = groups[e.value]!.totalPL;
-      return BarChartGroupData(x: e.key, barRods: [
-        BarChartRodData(
-          toY: pl,
-          fromY: 0,
-          color: (pl >= 0 ? Colors.green : Colors.red).withAlpha(200),
-          width: barWidth,
-          borderRadius: BorderRadius.circular(3),
-        ),
-      ]);
-    }).toList();
-
-    // Win rate bar groups (amber = positive, deepOrange = negative)
     final rateBarGroups = keys.asMap().entries.map((e) {
       final rate = rateValues[e.key];
       return BarChartGroupData(x: e.key, barRods: [
@@ -1114,11 +1091,9 @@ class _WinRateByAttributeChartState extends State<_WinRateByAttributeChart> {
       ]);
     }).toList();
 
-    const double leftSize = 72.0;
-    const double rightSize = 72.0;
+    const double leftSize = 64.0;
     const double bottomSize = 28.0;
 
-    // Compact axis label: +$1.2k, -$450, etc.
     String axisLabel(double v) {
       final abs = v.abs();
       final sign = v >= 0 ? '+' : '-';
@@ -1126,15 +1101,6 @@ class _WinRateByAttributeChartState extends State<_WinRateByAttributeChart> {
       if (abs >= 1000) return '$sign$sym${(abs / 1000).toStringAsFixed(1)}k';
       return '$sign$sym${abs.toStringAsFixed(0)}';
     }
-
-    FlGridData gridLines() => FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (v) => FlLine(
-            color: v == 0 ? Colors.white38 : Colors.white12,
-            strokeWidth: v == 0 ? 1.5 : 0.5,
-          ),
-        );
 
     return Card(
       child: Padding(
@@ -1171,107 +1137,38 @@ class _WinRateByAttributeChartState extends State<_WinRateByAttributeChart> {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            // Legend
-            Row(
-              children: [
-                Container(
-                    width: 14,
-                    height: 10,
-                    decoration: BoxDecoration(
-                        color: Colors.green.withAlpha(200),
-                        borderRadius: BorderRadius.circular(2))),
-                const SizedBox(width: 4),
-                Text('P&L',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(fontSize: 10)),
-                const SizedBox(width: 12),
-                Container(
-                    width: 14,
-                    height: 10,
-                    decoration: BoxDecoration(
-                        color: Colors.amber.withAlpha(200),
-                        borderRadius: BorderRadius.circular(2))),
-                const SizedBox(width: 4),
-                Text('$sym/hr',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(fontSize: 10, color: Colors.amber)),
-              ],
-            ),
             const SizedBox(height: 8),
-            // P&L bars — top chart (labels on left, right side blank-but-reserved)
             SizedBox(
-              height: 130,
-              child: BarChart(BarChartData(
-                barGroups: plBarGroups,
-                minY: plMinY,
-                maxY: plMaxY,
-                alignment: BarChartAlignment.spaceAround,
-                barTouchData: BarTouchData(enabled: false),
-                gridData: gridLines(),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  // Reserve rightSize so bar area matches bottom chart
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: rightSize,
-                      getTitlesWidget: (v, m) => const SizedBox.shrink(),
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: leftSize,
-                      getTitlesWidget: (v, _) => Text(
-                        axisLabel(v),
-                        style: const TextStyle(fontSize: 9),
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ),
-                  bottomTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                ),
-              )),
-            ),
-            // Win rate bars — bottom chart (labels on right, left side blank-but-reserved)
-            SizedBox(
-              height: 110,
+              height: 180,
               child: BarChart(BarChartData(
                 barGroups: rateBarGroups,
                 minY: rateMinY,
                 maxY: rateMaxY,
                 alignment: BarChartAlignment.spaceAround,
                 barTouchData: BarTouchData(enabled: false),
-                gridData: gridLines(),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (v) => FlLine(
+                    color: v == 0 ? Colors.white38 : Colors.white12,
+                    strokeWidth: v == 0 ? 1.5 : 0.5,
+                  ),
+                ),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
                   topTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false)),
-                  // Reserve leftSize so bar area matches top chart
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: leftSize,
-                      getTitlesWidget: (v, m) => const SizedBox.shrink(),
-                    ),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: rightSize,
                       getTitlesWidget: (v, _) => Text(
                         axisLabel(v),
                         style: const TextStyle(
                             fontSize: 9, color: Colors.amber),
-                        textAlign: TextAlign.left,
+                        textAlign: TextAlign.right,
                       ),
                     ),
                   ),
@@ -1281,9 +1178,7 @@ class _WinRateByAttributeChartState extends State<_WinRateByAttributeChart> {
                       reservedSize: bottomSize,
                       getTitlesWidget: (v, meta) {
                         final i = v.toInt();
-                        if (i < 0 || i >= keys.length) {
-                          return const SizedBox();
-                        }
+                        if (i < 0 || i >= keys.length) return const SizedBox();
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(shortLabel(keys[i]),

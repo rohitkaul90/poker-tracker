@@ -70,7 +70,7 @@ double calcROI(double profitLoss, double buyIn) {
 }
 
 String formatROI(double roiPercent) {
-  return '${roiPercent >= 0 ? '+' : ''}${roiPercent.toStringAsFixed(1)}%';
+  return '${roiPercent >= 0 ? '+' : ''}${roiPercent.toStringAsFixed(0)}%';
 }
 
 String tournamentBuyInBucket(double buyIn) {
