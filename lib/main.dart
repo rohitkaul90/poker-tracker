@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth/auth_gate.dart';
 import 'config/supabase_config.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/equity_calculator_screen.dart';
+import 'screens/reads_screen.dart';
 import 'screens/session_history_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -54,6 +56,8 @@ class _MainNavigationState extends State<MainNavigation> {
         children: const [
           DashboardScreen(),
           SessionHistoryScreen(),
+          EquityCalculatorScreen(),
+          ReadsScreen(),
           SettingsScreen(),
         ],
       ),
@@ -70,6 +74,16 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.list_outlined),
             selectedIcon: Icon(Icons.list),
             label: 'Sessions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calculate_outlined),
+            selectedIcon: Icon(Icons.calculate),
+            label: 'Equity',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.psychology_outlined),
+            selectedIcon: Icon(Icons.psychology),
+            label: 'Reads',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

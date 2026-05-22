@@ -27,37 +27,40 @@ class StatCard extends StatelessWidget {
           // Scale fonts proportionally to card height, clamped for min/max legibility.
           final valueFontSize = (h * 0.35).clamp(18.0, 42.0);
           final labelFontSize = (h * 0.17).clamp(10.0, 15.0);
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: labelFontSize,
-                    color: accent,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: h * 0.05),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    value,
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
                     style: TextStyle(
-                      fontSize: valueFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: valueColor ?? theme.colorScheme.onSurface,
+                      fontSize: labelFontSize,
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: (h * 0.04).clamp(2.0, 6.0)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: valueFontSize,
+                        fontWeight: FontWeight.bold,
+                        color: valueColor ?? theme.colorScheme.onSurface,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
