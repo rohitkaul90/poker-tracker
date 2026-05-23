@@ -60,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       const mobileRedirect = 'io.supabase.pokertracker://login-callback/';
-      const webRedirect = 'https://rohitkaul90.github.io/poker-tracker/';
+      const webRedirect = 'https://rohitkaul90.github.io/tablelab/';
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: kIsWeb ? webRedirect : mobileRedirect,
@@ -91,14 +91,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.casino_outlined,
-                      size: 64,
-                      color: theme.colorScheme.primary,
+                    Image.asset(
+                      'assets/icon/app_icon.png',
+                      width: 80,
+                      height: 80,
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Poker Tracker',
+                      'TableLab',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
