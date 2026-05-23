@@ -125201,7 +125201,7 @@ q=3
 k=$.hW().b
 k===$&&A.a()
 s=6
-return A.z(A.Zc(k.gfE(),B.r2,"https://rohitkaul90.github.io/tablelab/"),$async$Gb)
+return A.z(A.Zc(k.gfE(),B.r2,"https://tablelab.app/"),$async$Gb)
 case 6:o.push(5)
 s=4
 break

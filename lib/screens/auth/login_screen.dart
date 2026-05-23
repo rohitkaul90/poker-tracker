@@ -60,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       const mobileRedirect = 'io.supabase.pokertracker://login-callback/';
-      const webRedirect = 'https://rohitkaul90.github.io/tablelab/';
+      const webRedirect = 'https://tablelab.app/';
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: kIsWeb ? webRedirect : mobileRedirect,
