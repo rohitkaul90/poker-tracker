@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/player_read.dart';
 import '../providers/reads_provider.dart';
 import '../reads/tag_definitions.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/reads/quick_add_sheet.dart';
 import 'read_detail_screen.dart';
 
@@ -68,6 +69,7 @@ class _ReadsScreenState extends ConsumerState<ReadsScreen> {
     final readsAsync = ref.watch(readsProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(title: const Text('Player Reads')),
       body: Column(
         children: [

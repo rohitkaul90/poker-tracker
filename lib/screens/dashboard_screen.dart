@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/session_tile.dart';
 import 'log_session_screen.dart';
@@ -20,6 +21,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
+  // Filter state lifted here so the AppBar filter trigger can access it
+  String? _gameFilter;       // null | 'cash' | 'tournament'
+  String? _displayCurrency;  // null = auto (latest session currency)
+
   @override
   void initState() {
     super.initState();
@@ -33,13 +38,54 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     super.dispose();
   }
 
+  bool get _hasActiveFilter => _displayCurrency != null;
+
+  void _showFilterSheet(List<SessionModel> sessions) {
+    final effectiveCurrency = _displayCurrency ??
+        (sessions.isEmpty
+            ? 'CAD'
+            : ([...sessions]..sort((a, b) => b.date.compareTo(a.date)))
+                .first
+                .currency);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => _DashboardFilterSheet(
+        displayCurrency: effectiveCurrency,
+        onCurrencyChanged: (c) => setState(() => _displayCurrency = c),
+        onReset: () => setState(() => _displayCurrency = null),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final sessionsAsync = ref.watch(sessionsProvider);
     final showFab = _tabController.index == 0;
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Dashboard'),
+        actions: [
+          if (_tabController.index == 0)
+            sessionsAsync.maybeWhen(
+              data: (sessions) => IconButton(
+                icon: Badge(
+                  isLabelVisible: _hasActiveFilter,
+                  child: const Icon(Icons.tune),
+                ),
+                tooltip: 'Display options',
+                onPressed: () => _showFilterSheet(sessions),
+              ),
+              orElse: () => const SizedBox.shrink(),
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -61,17 +107,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           : null,
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          _OverviewTab(),
-          AnalyticsScreen(),
+        children: [
+          _OverviewTab(
+            gameFilter: _gameFilter,
+            displayCurrency: _displayCurrency,
+            onGameFilterChanged: (v) => setState(() => _gameFilter = v),
+          ),
+          const AnalyticsScreen(),
         ],
       ),
     );
   }
 }
 
+// ── Overview Tab ──────────────────────────────────────────────────────────────
+
 class _OverviewTab extends ConsumerWidget {
-  const _OverviewTab();
+  final String? gameFilter;
+  final String? displayCurrency;
+  final ValueChanged<String?> onGameFilterChanged;
+
+  const _OverviewTab({
+    required this.gameFilter,
+    required this.displayCurrency,
+    required this.onGameFilterChanged,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -79,92 +139,109 @@ class _OverviewTab extends ConsumerWidget {
     return sessionsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
-      data: (sessions) => _OverviewBody(sessions: sessions),
+      data: (sessions) => _OverviewBody(
+        sessions: sessions,
+        gameFilter: gameFilter,
+        displayCurrency: displayCurrency,
+        onGameFilterChanged: onGameFilterChanged,
+      ),
     );
   }
 }
 
-class _OverviewBody extends StatefulWidget {
+// ── Overview Body ─────────────────────────────────────────────────────────────
+
+class _OverviewBody extends StatelessWidget {
   final List<SessionModel> sessions;
+  final String? gameFilter;
+  final String? displayCurrency;
+  final ValueChanged<String?> onGameFilterChanged;
 
-  const _OverviewBody({required this.sessions});
+  const _OverviewBody({
+    required this.sessions,
+    required this.gameFilter,
+    required this.displayCurrency,
+    required this.onGameFilterChanged,
+  });
 
-  @override
-  State<_OverviewBody> createState() => _OverviewBodyState();
-}
-
-class _OverviewBodyState extends State<_OverviewBody> {
-  String? _gameFilter;       // null | 'cash' | 'tournament'
-  String? _displayCurrency;  // null = auto (latest session's currency)
-
-  String get _effectiveCurrency {
-    if (_displayCurrency != null) return _displayCurrency!;
-    if (widget.sessions.isEmpty) return 'CAD';
-    final sorted = [...widget.sessions]
-      ..sort((a, b) => b.date.compareTo(a.date));
-    return sorted.first.currency;
-  }
-
-  bool get _hasCash => widget.sessions.any((s) => s.gameType == 'cash');
+  bool get _hasCash => sessions.any((s) => s.gameType == 'cash');
   bool get _hasTournament =>
-      widget.sessions.any((s) => isTournamentType(s.gameType));
+      sessions.any((s) => isTournamentType(s.gameType));
   bool get _showGameFilter => _hasCash && _hasTournament;
 
+  String _effectiveCurrency() {
+    if (displayCurrency != null) return displayCurrency!;
+    if (sessions.isEmpty) return 'CAD';
+    return ([...sessions]..sort((a, b) => b.date.compareTo(a.date)))
+        .first
+        .currency;
+  }
+
   List<SessionModel> get _filtered {
-    if (_gameFilter == null) return widget.sessions;
-    if (_gameFilter == 'tournament') {
-      return widget.sessions.where((s) => isTournamentType(s.gameType)).toList();
+    if (gameFilter == null) return sessions;
+    if (gameFilter == 'tournament') {
+      return sessions.where((s) => isTournamentType(s.gameType)).toList();
     }
-    return widget.sessions.where((s) => s.gameType == 'cash').toList();
+    return sessions.where((s) => s.gameType == 'cash').toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    final displayCurrency = _effectiveCurrency;
-    final stats = _Stats.from(filtered, displayCurrency);
-    final recent = ([...widget.sessions]
+    final currency = _effectiveCurrency();
+    final stats = _Stats.from(filtered, currency);
+    final recent = ([...sessions]
           ..sort((a, b) => b.date.compareTo(a.date)))
         .take(5)
         .toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
-        _FilterRow(
-          gameFilter: _showGameFilter ? (_gameFilter ?? 'all') : null,
-          hasCash: _hasCash,
-          hasTournament: _hasTournament,
-          displayCurrency: displayCurrency,
-          onGameFilterChanged: (v) =>
-              setState(() => _gameFilter = v == 'all' ? null : v),
-          onCurrencyChanged: (c) => setState(() => _displayCurrency = c),
-        ),
-        const SizedBox(height: 12),
+        // ── Game-type chip strip ───────────────────────────────────────────
+        if (_showGameFilter) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final entry in [
+                  (null, 'All'),
+                  ('cash', 'Cash'),
+                  ('tournament', 'Tournament'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(entry.$2),
+                      selected: gameFilter == entry.$1,
+                      onSelected: (_) => onGameFilterChanged(entry.$1),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
 
-        // Total P&L hero card
+        // ── Total P&L hero card ────────────────────────────────────────────
         Card(
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             child: Column(
               children: [
                 Text(
-                  _gameFilter == null
+                  gameFilter == null
                       ? 'Total P&L'
-                      : '${_gameFilter == 'cash' ? 'Cash' : 'Tournament'} P&L',
+                      : '${gameFilter == 'cash' ? 'Cash' : 'Tournament'} P&L',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  formatPLWithCurrency(stats.totalPL, displayCurrency),
-                  style: Theme.of(context)
-                      .textTheme
-                      .displayMedium
-                      ?.copyWith(
-                    color: stats.totalPL >= 0 ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  formatPLWithCurrency(stats.totalPL, currency),
+                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                        color: stats.totalPL >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -172,72 +249,74 @@ class _OverviewBodyState extends State<_OverviewBody> {
         ),
         const SizedBox(height: 12),
 
-        // Stat cards grid — 4 columns on wide screens, 2 on mobile
-        LayoutBuilder(builder: (context, constraints) => GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: constraints.maxWidth > 520 ? 4 : 2,
-          childAspectRatio: 2.0,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          children: _gameFilter == 'tournament'
-              ? [
-                  StatCard(
-                    label: 'Sessions',
-                    value: '${stats.sessionCount}',
-                    accentColor: Colors.deepPurple,
-                  ),
-                  StatCard(
-                    label: 'ITM',
-                    value: '${stats.itm}',
-                    accentColor: Colors.teal,
-                  ),
-                  StatCard(
-                    label: 'ITM %',
-                    value: '${stats.itmPct.toStringAsFixed(0)}%',
-                    accentColor: Colors.cyan,
-                  ),
-                  StatCard(
-                    label: 'ROI',
-                    value: formatROI(stats.roi),
-                    valueColor: stats.roi >= 0 ? Colors.green : Colors.red,
-                    accentColor: Colors.amber,
-                  ),
-                ]
-              : [
-                  StatCard(
-                    label: 'Hours Played',
-                    value: '${stats.totalHours.round()}h',
-                    accentColor: Colors.blue,
-                  ),
-                  StatCard(
-                    label: 'Win Rate',
-                    value:
-                        '${formatPLWithCurrency(stats.hourlyRate, displayCurrency)}/hr',
-                    valueColor:
-                        stats.hourlyRate >= 0 ? Colors.green : Colors.red,
-                    accentColor: Colors.teal,
-                  ),
-                  StatCard(
-                    label: 'Sessions',
-                    value: '${stats.sessionCount}',
-                    accentColor: Colors.deepPurple,
-                  ),
-                  StatCard(
-                    label: 'W / L',
-                    value: '${stats.wins}W  ${stats.losses}L',
-                    valueColor: stats.wins > stats.losses
-                        ? Colors.green
-                        : stats.losses > stats.wins
-                            ? Colors.red
-                            : null,
-                    accentColor: Colors.orange,
-                  ),
-                ],
-        )),
+        // ── Stat cards grid ────────────────────────────────────────────────
+        LayoutBuilder(
+          builder: (context, constraints) => GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: constraints.maxWidth > 520 ? 4 : 2,
+            childAspectRatio: 2.0,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            children: gameFilter == 'tournament'
+                ? [
+                    StatCard(
+                      label: 'Sessions',
+                      value: '${stats.sessionCount}',
+                      accentColor: Colors.deepPurple,
+                    ),
+                    StatCard(
+                      label: 'ITM',
+                      value: '${stats.itm}',
+                      accentColor: Colors.teal,
+                    ),
+                    StatCard(
+                      label: 'ITM %',
+                      value: '${stats.itmPct.toStringAsFixed(0)}%',
+                      accentColor: Colors.cyan,
+                    ),
+                    StatCard(
+                      label: 'ROI',
+                      value: formatROI(stats.roi),
+                      valueColor: stats.roi >= 0 ? Colors.green : Colors.red,
+                      accentColor: Colors.amber,
+                    ),
+                  ]
+                : [
+                    StatCard(
+                      label: 'Hours Played',
+                      value: '${stats.totalHours.round()}h',
+                      accentColor: Colors.blue,
+                    ),
+                    StatCard(
+                      label: 'Win Rate',
+                      value:
+                          '${formatPLWithCurrency(stats.hourlyRate, currency)}/hr',
+                      valueColor:
+                          stats.hourlyRate >= 0 ? Colors.green : Colors.red,
+                      accentColor: Colors.teal,
+                    ),
+                    StatCard(
+                      label: 'Sessions',
+                      value: '${stats.sessionCount}',
+                      accentColor: Colors.deepPurple,
+                    ),
+                    StatCard(
+                      label: 'W / L',
+                      value: '${stats.wins}W  ${stats.losses}L',
+                      valueColor: stats.wins > stats.losses
+                          ? Colors.green
+                          : stats.losses > stats.wins
+                              ? Colors.red
+                              : null,
+                      accentColor: Colors.orange,
+                    ),
+                  ],
+          ),
+        ),
         const SizedBox(height: 20),
 
-        // Recent sessions
+        // ── Recent sessions ────────────────────────────────────────────────
         if (recent.isNotEmpty) ...[
           Text('Recent Sessions',
               style: Theme.of(context).textTheme.titleMedium),
@@ -256,8 +335,7 @@ class _OverviewBodyState extends State<_OverviewBody> {
           const Padding(
             padding: EdgeInsets.only(top: 48),
             child: Center(
-              child: Text(
-                  'No sessions yet.\nTap + to log your first session!'),
+              child: Text('No sessions yet.\nTap + to log your first session!'),
             ),
           ),
       ],
@@ -265,128 +343,107 @@ class _OverviewBodyState extends State<_OverviewBody> {
   }
 }
 
-// ─── Filter Row ───────────────────────────────────────────────────────────────
+// ── Dashboard filter sheet (currency) ─────────────────────────────────────────
 
-class _FilterRow extends StatelessWidget {
-  final String? gameFilter; // null = hide segment, else 'all'|'cash'|'tournament'
-  final bool hasCash;
-  final bool hasTournament;
+class _DashboardFilterSheet extends StatefulWidget {
   final String displayCurrency;
-  final ValueChanged<String> onGameFilterChanged;
   final ValueChanged<String> onCurrencyChanged;
+  final VoidCallback onReset;
 
-  const _FilterRow({
-    required this.gameFilter,
-    required this.hasCash,
-    required this.hasTournament,
+  const _DashboardFilterSheet({
     required this.displayCurrency,
-    required this.onGameFilterChanged,
     required this.onCurrencyChanged,
+    required this.onReset,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (gameFilter != null) ...[
-          _GameTypeDropdown(
-            value: gameFilter!,
-            hasCash: hasCash,
-            hasTournament: hasTournament,
-            onChanged: onGameFilterChanged,
-          ),
-          const SizedBox(width: 8),
-        ],
-        _CurrencyDropdown(
-          value: displayCurrency,
-          onChanged: onCurrencyChanged,
-        ),
-      ],
-    );
-  }
+  State<_DashboardFilterSheet> createState() => _DashboardFilterSheetState();
 }
 
-class _GameTypeDropdown extends StatelessWidget {
-  final String value; // 'all' | 'cash' | 'tournament'
-  final bool hasCash;
-  final bool hasTournament;
-  final ValueChanged<String> onChanged;
+class _DashboardFilterSheetState extends State<_DashboardFilterSheet> {
+  late String _currency;
 
-  const _GameTypeDropdown({
-    required this.value,
-    required this.hasCash,
-    required this.hasTournament,
-    required this.onChanged,
-  });
+  @override
+  void initState() {
+    super.initState();
+    _currency = widget.displayCurrency;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withAlpha(80)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isDense: true,
-          items: [
-            const DropdownMenuItem(
-                value: 'all',
-                child: Text('All Games', style: TextStyle(fontSize: 13))),
-            if (hasCash)
-              const DropdownMenuItem(
-                  value: 'cash',
-                  child: Text('Cash', style: TextStyle(fontSize: 13))),
-            if (hasTournament)
-              const DropdownMenuItem(
-                  value: 'tournament',
-                  child:
-                      Text('Tournament', style: TextStyle(fontSize: 13))),
+    final theme = Theme.of(context);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.45,
+      maxChildSize: 0.7,
+      builder: (context, scroll) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: ListView(
+          controller: scroll,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text('Display Options',
+                style: theme.textTheme.titleLarge),
+            const SizedBox(height: 20),
+
+            Text('Currency', style: theme.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: supportedDisplayCurrencies.map((c) {
+                final selected = _currency == c;
+                return ChoiceChip(
+                  label: Text('$c ${currencySymbol(c)}'),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _currency = c),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      widget.onReset();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Reset'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      widget.onCurrencyChanged(_currency);
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Apply'),
+                  ),
+                ),
+              ],
+            ),
           ],
-          onChanged: (v) => onChanged(v!),
         ),
       ),
     );
   }
 }
 
-class _CurrencyDropdown extends StatelessWidget {
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  const _CurrencyDropdown({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withAlpha(80)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isDense: true,
-          items: supportedDisplayCurrencies
-              .map((c) => DropdownMenuItem(
-                    value: c,
-                    child: Text('$c ${currencySymbol(c)}',
-                        style: const TextStyle(fontSize: 13)),
-                  ))
-              .toList(),
-          onChanged: (c) => onChanged(c!),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Stats Model ─────────────────────────────────────────────────────────────
+// ── Stats Model ───────────────────────────────────────────────────────────────
 
 class _Stats {
   final double totalPL;

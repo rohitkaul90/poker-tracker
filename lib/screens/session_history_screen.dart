@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/session_model.dart';
 import '../providers/providers.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/session_tile.dart';
 import 'log_session_screen.dart';
 import 'session_detail_screen.dart';
@@ -18,6 +19,7 @@ class SessionHistoryScreen extends ConsumerWidget {
     final hasFilter = !filter.isEmpty;
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Sessions'),
         actions: [

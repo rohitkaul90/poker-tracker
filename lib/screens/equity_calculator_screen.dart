@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../equity/card.dart';
 import '../equity/simulator.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/equity/card_picker.dart';
 import '../widgets/equity/player_range_editor.dart';
 import '../widgets/equity/range_matrix.dart';
@@ -187,6 +188,7 @@ class _EquityCalculatorScreenState extends State<EquityCalculatorScreen> {
     );
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Equity Calculator'),
         actions: [

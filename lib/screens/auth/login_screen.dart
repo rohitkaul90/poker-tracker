@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -14,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _isRegister = false;
   bool _loading = false;
+  bool _googleLoading = false;
   String? _error;
 
   @override
@@ -42,13 +44,35 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordCtrl.text,
         );
       }
-      // AuthGate stream handles navigation automatically
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _googleLoading = true;
+      _error = null;
+    });
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb
+            ? 'https://rohitkaul90.github.io/poker-tracker/'
+            : null,
+      );
+      // Web: browser redirects externally; AuthGate picks up the session on return.
+      // Mobile: requires deep-link setup in AndroidManifest / Info.plist.
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
     }
   }
 
@@ -82,13 +106,53 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _isRegister ? 'Create your account' : 'Sign in to continue',
+                      _isRegister
+                          ? 'Create your account'
+                          : 'Sign in to continue',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.outline,
                       ),
                     ),
                     const SizedBox(height: 32),
+
+                    // ── Google sign-in ─────────────────────────────────────
+                    OutlinedButton.icon(
+                      onPressed:
+                          (_loading || _googleLoading) ? null : _signInWithGoogle,
+                      icon: _googleLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const _GoogleLogo(),
+                      label: Text(_googleLoading
+                          ? 'Connecting…'
+                          : 'Continue with Google'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        side: BorderSide(
+                            color: theme.colorScheme.outline.withAlpha(100)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Divider ────────────────────────────────────────────
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('or',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.outline)),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Email / password ───────────────────────────────────
                     TextFormField(
                       controller: _emailCtrl,
                       decoration: const InputDecoration(
@@ -131,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: _loading ? null : _submit,
+                      onPressed: (_loading || _googleLoading) ? null : _submit,
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
                       ),
@@ -139,9 +203,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_isRegister ? 'Create Account' : 'Sign In'),
+                          : Text(
+                              _isRegister ? 'Create Account' : 'Sign In'),
                     ),
                     const SizedBox(height: 16),
                     TextButton(
@@ -164,4 +230,19 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+// Simple Google "G" logo drawn with text since we have no asset
+class _GoogleLogo extends StatelessWidget {
+  const _GoogleLogo();
+
+  @override
+  Widget build(BuildContext context) => const Text(
+        'G',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF4285F4),
+        ),
+      );
 }

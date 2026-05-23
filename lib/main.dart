@@ -7,7 +7,6 @@ import 'screens/dashboard_screen.dart';
 import 'screens/equity_calculator_screen.dart';
 import 'screens/reads_screen.dart';
 import 'screens/session_history_screen.dart';
-import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,7 +57,6 @@ class _MainNavigationState extends State<MainNavigation> {
           SessionHistoryScreen(),
           EquityCalculatorScreen(),
           ReadsScreen(),
-          SettingsScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -84,11 +82,6 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.psychology_outlined),
             selectedIcon: Icon(Icons.psychology),
             label: 'Reads',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
           ),
         ],
       ),
