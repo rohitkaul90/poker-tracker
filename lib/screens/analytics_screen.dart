@@ -111,6 +111,39 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
   bool get _hasLive =>
       widget.sessions.any((s) => !isOnlineSession(s.location));
 
+  bool get _hasActiveFilter =>
+      _displayCurrency != null || _countryFilter != null || _venueFilter != null;
+
+  void _showFilterSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => _AnalyticsFilterSheet(
+        displayCurrency: _effectiveCurrency,
+        countryFilter: _countryFilter,
+        venueFilter: _venueFilter,
+        allCountries: _allCountries.toList()..sort(),
+        hasMultipleCountries: _hasMultipleCountries,
+        hasOnline: _hasOnline,
+        hasLive: _hasLive,
+        onApply: (currency, country, venue) => setState(() {
+          _displayCurrency = currency;
+          _countryFilter = country;
+          _venueFilter = venue;
+        }),
+        onReset: () => setState(() {
+          _displayCurrency = null;
+          _countryFilter = null;
+          _venueFilter = null;
+        }),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -118,89 +151,50 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
     final displayCurrency = _effectiveCurrency;
     final showingTournaments = filtered.any((s) => isTournamentType(s.gameType));
     final showingCash = filtered.any((s) => s.gameType == 'cash');
-    final showRow2 = _hasMultipleCountries || (_hasOnline && _hasLive);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
       children: [
-        // Row 1: game type + currency
+        // ── Game-type chip strip + filter trigger ──────────────────────────
         Row(
           children: [
-            _DropdownContainer(
-              child: DropdownButton<String>(
-                value: _gameFilter ?? 'all',
-                isDense: true,
-                underline: const SizedBox.shrink(),
-                items: [
-                  const DropdownMenuItem(
-                      value: 'all',
-                      child: Text('All Games',
-                          style: TextStyle(fontSize: 13))),
-                  if (_hasCash)
-                    const DropdownMenuItem(
-                        value: 'cash',
-                        child:
-                            Text('Cash', style: TextStyle(fontSize: 13))),
-                  if (_hasTournament)
-                    const DropdownMenuItem(
-                        value: 'tournament',
-                        child: Text('Tournament',
-                            style: TextStyle(fontSize: 13))),
-                ],
-                onChanged: (v) =>
-                    setState(() => _gameFilter = v == 'all' ? null : v),
+            if (_hasCash && _hasTournament)
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final entry in [
+                        (null, 'All'),
+                        ('cash', 'Cash'),
+                        ('tournament', 'Tournament'),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(entry.$2),
+                            selected: _gameFilter == entry.$1,
+                            onSelected: (_) =>
+                                setState(() => _gameFilter = entry.$1),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              const Spacer(),
+            IconButton(
+              icon: Badge(
+                isLabelVisible: _hasActiveFilter,
+                child: const Icon(Icons.tune),
               ),
-            ),
-            const SizedBox(width: 8),
-            _CurrencyDropdown(
-              value: displayCurrency,
-              onChanged: (c) => setState(() => _displayCurrency = c),
+              tooltip: 'Filter',
+              onPressed: () => _showFilterSheet(context),
             ),
           ],
         ),
-
-        // Row 2: country + venue (conditional)
-        if (showRow2) ...[
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (_hasMultipleCountries) ...[
-                _CountryDropdown(
-                  countries: _allCountries.toList()..sort(),
-                  value: _countryFilter,
-                  onChanged: (c) => setState(() => _countryFilter = c),
-                ),
-                if (_hasOnline && _hasLive) const SizedBox(width: 8),
-              ],
-              if (_hasOnline && _hasLive)
-                _DropdownContainer(
-                  child: DropdownButton<String>(
-                    value: _venueFilter ?? 'all',
-                    isDense: true,
-                    underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'all',
-                          child: Text('All Venues',
-                              style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(
-                          value: 'live',
-                          child: Text('Live',
-                              style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(
-                          value: 'online',
-                          child: Text('Online',
-                              style: TextStyle(fontSize: 13))),
-                    ],
-                    onChanged: (v) => setState(
-                        () => _venueFilter = v == 'all' ? null : v),
-                  ),
-                ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
 
         if (filtered.isEmpty)
           const Padding(
@@ -391,62 +385,6 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
 }
 
 // ─── Dropdowns ────────────────────────────────────────────────────────────────
-
-class _CurrencyDropdown extends StatelessWidget {
-  final String value;
-  final ValueChanged<String> onChanged;
-  const _CurrencyDropdown({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return _DropdownContainer(
-      child: DropdownButton<String>(
-        value: value,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        items: supportedDisplayCurrencies
-            .map((c) => DropdownMenuItem(
-                  value: c,
-                  child: Text('$c ${currencySymbol(c)}',
-                      style: const TextStyle(fontSize: 13)),
-                ))
-            .toList(),
-        onChanged: (c) => onChanged(c!),
-      ),
-    );
-  }
-}
-
-class _CountryDropdown extends StatelessWidget {
-  final List<String> countries;
-  final String? value;
-  final ValueChanged<String?> onChanged;
-  const _CountryDropdown(
-      {required this.countries, required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return _DropdownContainer(
-      child: DropdownButton<String?>(
-        value: value,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        hint: const Text('All Countries', style: TextStyle(fontSize: 13)),
-        items: [
-          const DropdownMenuItem<String?>(
-            value: null,
-            child: Text('All Countries', style: TextStyle(fontSize: 13)),
-          ),
-          ...countries.map((c) => DropdownMenuItem<String?>(
-                value: c,
-                child: Text(c, style: const TextStyle(fontSize: 13)),
-              )),
-        ],
-        onChanged: onChanged,
-      ),
-    );
-  }
-}
 
 class _DropdownContainer extends StatelessWidget {
   final Widget child;
@@ -1659,6 +1597,167 @@ class _RecommendationsCard extends StatelessWidget {
     return 'Late Night';
   }
 }
+
+// ─── Analytics filter bottom sheet ───────────────────────────────────────────
+
+class _AnalyticsFilterSheet extends StatefulWidget {
+  final String displayCurrency;
+  final String? countryFilter;
+  final String? venueFilter;
+  final List<String> allCountries;
+  final bool hasMultipleCountries;
+  final bool hasOnline;
+  final bool hasLive;
+  final void Function(String? currency, String? country, String? venue) onApply;
+  final VoidCallback onReset;
+
+  const _AnalyticsFilterSheet({
+    required this.displayCurrency,
+    required this.countryFilter,
+    required this.venueFilter,
+    required this.allCountries,
+    required this.hasMultipleCountries,
+    required this.hasOnline,
+    required this.hasLive,
+    required this.onApply,
+    required this.onReset,
+  });
+
+  @override
+  State<_AnalyticsFilterSheet> createState() => _AnalyticsFilterSheetState();
+}
+
+class _AnalyticsFilterSheetState extends State<_AnalyticsFilterSheet> {
+  late String _currency;
+  late String? _country;
+  late String? _venue;
+
+  @override
+  void initState() {
+    super.initState();
+    _currency = widget.displayCurrency;
+    _country = widget.countryFilter;
+    _venue = widget.venueFilter;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.55,
+      maxChildSize: 0.9,
+      builder: (context, scroll) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: ListView(
+          controller: scroll,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text('Display Options', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 20),
+
+            // Currency
+            Text('Currency', style: theme.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: supportedDisplayCurrencies.map((c) => ChoiceChip(
+                label: Text('$c ${currencySymbol(c)}'),
+                selected: _currency == c,
+                onSelected: (_) => setState(() => _currency = c),
+              )).toList(),
+            ),
+
+            // Country (only if multiple)
+            if (widget.hasMultipleCountries) ...[
+              const SizedBox(height: 20),
+              Text('Country', style: theme.textTheme.labelLarge),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilterChip(
+                    label: const Text('All Countries'),
+                    selected: _country == null,
+                    onSelected: (_) => setState(() => _country = null),
+                  ),
+                  ...widget.allCountries.map((c) => FilterChip(
+                    label: Text(c),
+                    selected: _country == c,
+                    onSelected: (on) =>
+                        setState(() => _country = on ? c : null),
+                  )),
+                ],
+              ),
+            ],
+
+            // Venue (only if both live and online exist)
+            if (widget.hasLive && widget.hasOnline) ...[
+              const SizedBox(height: 20),
+              Text('Venue', style: theme.textTheme.labelLarge),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final entry in [
+                    (null, 'All Venues'),
+                    ('live', 'Live'),
+                    ('online', 'Online'),
+                  ])
+                    ChoiceChip(
+                      label: Text(entry.$2),
+                      selected: _venue == entry.$1,
+                      onSelected: (_) => setState(() => _venue = entry.$1),
+                    ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      widget.onReset();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Reset'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      widget.onApply(_currency, _country, _venue);
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Apply'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Recommendation rows ──────────────────────────────────────────────────────
 
 class _RecRow extends StatelessWidget {
   final _Rec rec;
