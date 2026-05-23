@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/poker_rooms.dart';
 import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
@@ -21,9 +22,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  // Filter state lifted here so the AppBar filter trigger can access it
-  String? _gameFilter;       // null | 'cash' | 'tournament'
-  String? _displayCurrency;  // null = auto (latest session currency)
+  // Overview filter state
+  String? _gameFilter;
+  String? _displayCurrency;
+
+  // Analytics filter state
+  String? _analyticsVenueFilter;
+  String? _analyticsCountryFilter;
+  String? _analyticsLocationFilter;
+  String? _analyticsDisplayCurrency;
+  String? _analyticsDateFilter;
 
   @override
   void initState() {
@@ -39,6 +47,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 
   bool get _hasActiveFilter => _displayCurrency != null;
+
+  bool get _hasActiveAnalyticsFilter =>
+      _analyticsDisplayCurrency != null ||
+      _analyticsCountryFilter != null ||
+      _analyticsVenueFilter != null ||
+      _analyticsLocationFilter != null ||
+      _analyticsDateFilter != null;
 
   void _showFilterSheet(List<SessionModel> sessions) {
     final effectiveCurrency = _displayCurrency ??
@@ -63,6 +78,66 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     );
   }
 
+  void _showAnalyticsFilterSheet(List<SessionModel> sessions) {
+    final effectiveCurrency = _analyticsDisplayCurrency ??
+        (sessions.isEmpty
+            ? 'CAD'
+            : ([...sessions]..sort((a, b) => b.date.compareTo(a.date)))
+                .first
+                .currency);
+
+    final allCountries = sessions
+        .map((s) => s.country)
+        .whereType<String>()
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    final allLocations = sessions
+        .map((s) => s.location)
+        .whereType<String>()
+        .where((l) => l.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => AnalyticsFilterSheet(
+        displayCurrency: effectiveCurrency,
+        countryFilter: _analyticsCountryFilter,
+        venueFilter: _analyticsVenueFilter,
+        locationFilter: _analyticsLocationFilter,
+        dateFilter: _analyticsDateFilter,
+        allCountries: allCountries,
+        hasMultipleCountries: allCountries.length > 1,
+        hasOnline: sessions.any((s) => isOnlineSession(s.location)),
+        hasLive: sessions.any((s) => !isOnlineSession(s.location)),
+        allLocations: allLocations,
+        onApply: (currency, country, venue, location, date) => setState(() {
+          _analyticsDisplayCurrency = currency;
+          _analyticsCountryFilter = country;
+          _analyticsVenueFilter = venue;
+          _analyticsLocationFilter = location;
+          _analyticsDateFilter = date;
+        }),
+        onReset: () => setState(() {
+          _analyticsDisplayCurrency = null;
+          _analyticsCountryFilter = null;
+          _analyticsVenueFilter = null;
+          _analyticsLocationFilter = null;
+          _analyticsDateFilter = null;
+        }),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sessionsAsync = ref.watch(sessionsProvider);
@@ -82,6 +157,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 ),
                 tooltip: 'Display options',
                 onPressed: () => _showFilterSheet(sessions),
+              ),
+              orElse: () => const SizedBox.shrink(),
+            ),
+          if (_tabController.index == 1)
+            sessionsAsync.maybeWhen(
+              data: (sessions) => IconButton(
+                icon: Badge(
+                  isLabelVisible: _hasActiveAnalyticsFilter,
+                  child: const Icon(Icons.tune),
+                ),
+                tooltip: 'Display options',
+                onPressed: () => _showAnalyticsFilterSheet(sessions),
               ),
               orElse: () => const SizedBox.shrink(),
             ),
@@ -113,7 +200,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             displayCurrency: _displayCurrency,
             onGameFilterChanged: (v) => setState(() => _gameFilter = v),
           ),
-          const AnalyticsScreen(),
+          AnalyticsScreen(
+            venueFilter: _analyticsVenueFilter,
+            countryFilter: _analyticsCountryFilter,
+            locationFilter: _analyticsLocationFilter,
+            displayCurrency: _analyticsDisplayCurrency,
+            dateFilter: _analyticsDateFilter,
+          ),
         ],
       ),
     );
