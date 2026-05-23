@@ -59,14 +59,14 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
+      const mobileRedirect = 'io.supabase.pokertracker://login-callback/';
+      const webRedirect = 'https://rohitkaul90.github.io/poker-tracker/';
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: kIsWeb
-            ? 'https://rohitkaul90.github.io/poker-tracker/'
-            : null,
+        redirectTo: kIsWeb ? webRedirect : mobileRedirect,
       );
       // Web: browser redirects externally; AuthGate picks up the session on return.
-      // Mobile: requires deep-link setup in AndroidManifest / Info.plist.
+      // Android: Chrome Custom Tab opens, redirects back via the deep-link scheme.
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
