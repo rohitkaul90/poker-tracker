@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/session_model.dart';
 import '../models/session_filter.dart';
+import '../models/hand_model.dart';
 import '../services/supabase_service.dart';
+import '../services/hand_service.dart';
 
 export '../models/session_filter.dart' show SessionFilter, SessionResult;
 
@@ -45,4 +47,10 @@ final distinctLocationsProvider = Provider<AsyncValue<List<String>>>((ref) {
         .toList()
       ..sort(),
   );
+});
+
+final handServiceProvider = Provider<HandService>((ref) => HandService());
+
+final handsProvider = FutureProvider<List<PokerHand>>((ref) {
+  return ref.read(handServiceProvider).fetchHands();
 });

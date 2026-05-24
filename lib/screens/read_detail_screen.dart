@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/player_read.dart';
 import '../providers/reads_provider.dart';
 import '../reads/insights_engine.dart';
@@ -123,6 +124,30 @@ class _ReadDetailScreenState extends ConsumerState<ReadDetailScreen> {
     }
   }
 
+  void _shareRead() {
+    final buf = StringBuffer();
+    buf.writeln('Player Read: ${_read.playerLabel}');
+    if (_read.tags.isNotEmpty) {
+      buf.writeln('Tags: ${_read.tags.map(tagDisplayName).join(', ')}');
+    }
+    if (_notes.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('Observations:');
+      for (final note in _notes) {
+        final parts = <String>[];
+        if (note.position != null) parts.add('Pos: ${note.position}');
+        if (note.street != null) parts.add('Street: ${note.street}');
+        if (note.action != null) parts.add('Action: ${note.action}');
+        if (note.sizing != null) parts.add('Sizing: ${note.sizing}');
+        if (note.cardsShown != null) parts.add('Cards: ${note.cardsShown}');
+        if (note.noteText?.isNotEmpty == true) parts.add(note.noteText!);
+        if (parts.isNotEmpty) buf.writeln('• ${parts.join(' · ')}');
+      }
+    }
+    SharePlus.instance.share(
+        ShareParams(subject: 'Player Read', text: buf.toString().trim()));
+  }
+
   Future<void> _deleteRead() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -162,6 +187,11 @@ class _ReadDetailScreenState extends ConsumerState<ReadDetailScreen> {
       appBar: AppBar(
         title: Text(_read.playerLabel),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined, size: 20),
+            tooltip: 'Share notes',
+            onPressed: _shareRead,
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             color: Colors.redAccent,
@@ -301,6 +331,7 @@ class _ReadDetailScreenState extends ConsumerState<ReadDetailScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_read_detail',
         onPressed: _openAddNote,
         icon: const Icon(Icons.add_comment_outlined),
         label: const Text('Add Observation'),

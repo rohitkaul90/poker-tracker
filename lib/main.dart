@@ -5,6 +5,7 @@ import 'auth/auth_gate.dart';
 import 'config/supabase_config.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/equity_calculator_screen.dart';
+import 'screens/hands_screen.dart';
 import 'screens/reads_screen.dart';
 import 'screens/session_history_screen.dart';
 
@@ -23,7 +24,7 @@ class PokerTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Poker Tracker',
+      title: 'TableLab',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -55,6 +56,7 @@ class _MainNavigationState extends State<MainNavigation> {
         children: const [
           DashboardScreen(),
           SessionHistoryScreen(),
+          HandsScreen(),
           EquityCalculatorScreen(),
           ReadsScreen(),
         ],
@@ -72,6 +74,11 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.list_outlined),
             selectedIcon: Icon(Icons.list),
             label: 'Sessions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.style_outlined),
+            selectedIcon: Icon(Icons.style),
+            label: 'Hands',
           ),
           NavigationDestination(
             icon: Icon(Icons.calculate_outlined),
