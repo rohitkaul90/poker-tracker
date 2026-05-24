@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/profile_provider.dart';
 import '../screens/profile_screen.dart';
+import '../screens/about_screen.dart';
+import '../screens/help_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -108,6 +110,46 @@ class AppDrawer extends ConsumerWidget {
 
             const Divider(height: 1),
 
+            // ── App section ────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+              child: Text(
+                'APP',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline_rounded),
+              title: const Text('Help & FAQ'),
+              subtitle: const Text('Features, tips, common questions',
+                  style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('About TableLab'),
+              subtitle: const Text('What we\'re building and why',
+                  style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AboutScreen()),
+                );
+              },
+            ),
+
             // ── Settings section ───────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
@@ -124,16 +166,9 @@ class AppDrawer extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.lock_reset_outlined),
               title: const Text('Reset Password'),
-              subtitle: const Text('Send reset link to email',
+              subtitle: const Text('Send reset link to your email',
                   style: TextStyle(fontSize: 11)),
               onTap: () => _sendPasswordReset(context, email),
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('About'),
-              subtitle: const Text('Poker Tracker v1.0',
-                  style: TextStyle(fontSize: 11)),
-              onTap: () => Navigator.pop(context),
             ),
 
             const Spacer(),

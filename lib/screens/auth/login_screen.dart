@@ -16,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isRegister = false;
   bool _loading = false;
   bool _googleLoading = false;
+  bool _resetLoading = false;
   String? _error;
 
   @override
@@ -50,6 +51,59 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailCtrl.text.trim();
+    String? target = email.contains('@') ? email : null;
+
+    if (target == null) {
+      // Ask for email in a dialog
+      final ctrl = TextEditingController();
+      target = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Reset Password'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email address',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('Send Link'),
+            ),
+          ],
+        ),
+      );
+      ctrl.dispose();
+    }
+
+    if (target == null || target.isEmpty || !target.contains('@')) return;
+    setState(() => _resetLoading = true);
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(target);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Reset link sent to $target')),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _resetLoading = false);
     }
   }
 
@@ -185,6 +239,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
+                    if (!_isRegister) ...[
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: (_loading || _googleLoading || _resetLoading)
+                              ? null
+                              : _forgotPassword,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: _resetLoading
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Text(
+                                  'Forgot password?',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
                       Text(
