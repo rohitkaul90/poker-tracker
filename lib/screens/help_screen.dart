@@ -10,32 +10,38 @@ class HelpScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Help & FAQ')),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          _SectionHeader('Getting Started', Icons.flag_outlined, primary),
-          ..._gettingStarted.map((faq) => _FaqTile(faq)),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _SectionHeader('Getting Started', Icons.flag_outlined, primary),
+              ..._gettingStarted.map((faq) => _FaqTile(faq)),
 
-          _SectionHeader('Sessions', Icons.receipt_long_outlined, primary),
-          ..._sessions.map((faq) => _FaqTile(faq)),
+              _SectionHeader('Sessions', Icons.receipt_long_outlined, primary),
+              ..._sessions.map((faq) => _FaqTile(faq)),
 
-          _SectionHeader('Analytics', Icons.bar_chart_rounded, primary),
-          ..._analytics.map((faq) => _FaqTile(faq)),
+              _SectionHeader('Analytics', Icons.bar_chart_rounded, primary),
+              ..._analytics.map((faq) => _FaqTile(faq)),
 
-          _SectionHeader('Hand Replayer', Icons.play_circle_outline_rounded, primary),
-          ..._hands.map((faq) => _FaqTile(faq)),
+              _SectionHeader('Hand Replayer', Icons.play_circle_outline_rounded, primary),
+              ..._hands.map((faq) => _FaqTile(faq)),
 
-          _SectionHeader('Player Reads', Icons.psychology_outlined, primary),
-          ..._reads.map((faq) => _FaqTile(faq)),
+              _SectionHeader('Player Reads', Icons.psychology_outlined, primary),
+              ..._reads.map((faq) => _FaqTile(faq)),
 
-          _SectionHeader('Import & Export', Icons.import_export_rounded, primary),
-          ..._importExport.map((faq) => _FaqTile(faq)),
+              _SectionHeader('Import & Export', Icons.import_export_rounded, primary),
+              ..._importExport.map((faq) => _FaqTile(faq)),
 
-          _SectionHeader('Account & Data', Icons.security_outlined, primary),
-          ..._account.map((faq) => _FaqTile(faq)),
+              _SectionHeader('Account & Data', Icons.security_outlined, primary),
+              ..._account.map((faq) => _FaqTile(faq)),
 
-          const SizedBox(height: 32),
-        ],
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -278,7 +284,7 @@ class _SectionHeader extends StatelessWidget {
           Text(
             label.toUpperCase(),
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.1,
               color: color,
@@ -302,15 +308,15 @@ class _FaqTile extends StatelessWidget {
       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       title: Text(
         faq.q,
-        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
       ),
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           faq.a,
-          style: theme.textTheme.bodySmall?.copyWith(
+          style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurface.withAlpha(200),
-            height: 1.55,
+            height: 1.6,
           ),
         ),
       ],
