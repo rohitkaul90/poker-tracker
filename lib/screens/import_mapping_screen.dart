@@ -23,8 +23,9 @@ const _appFields = [
   _AppField('stakes',           'Stakes',                 hint: 'e.g. 1/2, 2/5'),
   _AppField('cash_out',         'Cash-out'),
   _AppField('prize_won',        'Prize Won'),
+  _AppField('profit_loss',      'P&L',                    hint: 'used to derive cash-out if absent'),
   _AppField('duration_minutes', 'Duration (minutes)'),
-  _AppField('duration_hours',   'Duration (hours)',       hint: 'auto-converted to minutes'),
+  _AppField('duration_hours',   'Duration (hours)',       hint: 'also accepts "1h 30m", "1:30" etc.'),
   _AppField('start_time',       'Start Time'),
   _AppField('end_time',         'End Time'),
   _AppField('location',         'Location / Venue'),
@@ -39,6 +40,133 @@ const _appFields = [
 ];
 
 const _notMapped = '-- Not in file --';
+
+// ─── Import presets ───────────────────────────────────────────────────────────
+
+class _Preset {
+  final String id;
+  final String name;
+  // Per-field ordered candidate header patterns (case-insensitive, normalized).
+  final Map<String, List<String>> columns;
+
+  const _Preset({required this.id, required this.name, required this.columns});
+}
+
+const _presets = [
+  _Preset(
+    id: 'tablelab',
+    name: 'TableLab',
+    columns: {
+      'date':             ['date'],
+      'buy_in':           ['buy_in'],
+      'game_type':        ['game_type'],
+      'stakes':           ['stakes'],
+      'cash_out':         ['cash_out'],
+      'prize_won':        ['prize_won'],
+      'profit_loss':      ['profit_loss'],
+      'duration_minutes': ['duration_minutes'],
+      'start_time':       ['start_time'],
+      'end_time':         ['end_time'],
+      'location':         ['location'],
+      'currency':         ['currency'],
+      'country':          ['country'],
+      'notes':            ['notes'],
+      'rake_paid':        ['rake_paid'],
+      'finish_position':  ['finish_position'],
+      'total_entrants':   ['total_entrants'],
+      'table_quality':    ['table_quality'],
+    },
+  ),
+  _Preset(
+    id: 'poker_income',
+    name: 'Poker Income',
+    columns: {
+      'date':           ['date'],
+      'game_type':      ['game type', 'gametype', 'type'],
+      'stakes':         ['stakes', 'game name', 'level'],
+      'buy_in':         ['buy-in', 'buyin', 'buy in', 'investment'],
+      'cash_out':       ['cash out', 'cashout', 'cash-out', 'winnings'],
+      'duration_hours': ['duration (hours)', 'duration', 'hours played', 'session length', 'length'],
+      'location':       ['location', 'venue', 'casino', 'room'],
+      'notes':          ['notes', 'note', 'comments'],
+    },
+  ),
+  _Preset(
+    id: 'bankrollmob',
+    name: 'BankrollMob',
+    columns: {
+      'date':           ['date'],
+      'game_type':      ['game type', 'type', 'gametype'],
+      'stakes':         ['stakes', 'blinds', 'limit'],
+      'buy_in':         ['buy in', 'buyin', 'buy-in', 'investment'],
+      'cash_out':       ['cash out', 'cashout', 'ending amount'],
+      'profit_loss':    ['net profit/loss', 'profit/loss', 'profit', 'net result', 'result'],
+      'duration_hours': ['session length', 'duration', 'hours'],
+      'location':       ['location', 'casino', 'site', 'venue'],
+      'notes':          ['notes'],
+    },
+  ),
+  _Preset(
+    id: 'simply_poker',
+    name: 'Simply Poker',
+    columns: {
+      'date':           ['date'],
+      'game_type':      ['type', 'game type', 'format'],
+      'stakes':         ['stakes', 'blinds'],
+      'buy_in':         ['buyin', 'buy-in', 'buy in'],
+      'cash_out':       ['cashout', 'cash-out', 'cash out'],
+      'duration_hours': ['duration', 'session length', 'time played', 'length'],
+      'location':       ['venue', 'location', 'casino'],
+      'notes':          ['notes', 'comment'],
+    },
+  ),
+  _Preset(
+    id: 'poker_analytics',
+    name: 'Poker Analytics',
+    columns: {
+      'date':             ['date'],
+      'game_type':        ['type', 'game type', 'variant'],
+      'stakes':           ['stakes', 'blinds', 'level'],
+      'buy_in':           ['buy in', 'buy-in', 'buyin'],
+      'cash_out':         ['cash out', 'cashout', 'cash-out'],
+      'duration_minutes': ['length (minutes)', 'duration (min)', 'minutes', 'duration minutes'],
+      'duration_hours':   ['length (hours)', 'duration (hours)', 'duration', 'length', 'hours'],
+      'location':         ['venue', 'location', 'room', 'casino'],
+      'notes':            ['notes', 'comments'],
+    },
+  ),
+  _Preset(
+    id: 'poker_journal',
+    name: 'Poker Journal',
+    columns: {
+      'date':           ['date', 'session date'],
+      'game_type':      ['game', 'game type', 'type', 'format'],
+      'stakes':         ['stakes', 'blinds', 'level'],
+      'buy_in':         ['buy-in', 'buy in', 'buyin'],
+      'cash_out':       ['cash-out', 'cash out', 'cashout'],
+      'duration_hours': ['duration', 'time', 'hours', 'session length'],
+      'location':       ['location', 'venue', 'casino', 'room'],
+      'notes':          ['notes', 'session notes', 'memo'],
+    },
+  ),
+  _Preset(
+    id: 'pokertracker',
+    name: 'PokerTracker 4',
+    columns: {
+      'date':             ['session start time', 'date', 'session date'],
+      'game_type':        ['game type', 'game', 'type'],
+      'stakes':           ['blinds', 'stakes', 'limit'],
+      'buy_in':           ['buy in', 'buyin', 'buy-in'],
+      'cash_out':         ['cash out', 'cashout'],
+      'profit_loss':      ['net won', 'net', 'profit', 'net profit', 'net amount'],
+      'duration_minutes': ['duration (min)', 'session length (min)', 'duration'],
+      'start_time':       ['session start time', 'start time', 'start'],
+      'end_time':         ['session end time', 'end time', 'end'],
+      'location':         ['table', 'room', 'site', 'location'],
+      'notes':            ['notes'],
+    },
+  ),
+];
 
 // ─── Preview model ────────────────────────────────────────────────────────────
 
@@ -83,6 +211,7 @@ class ImportMappingScreen extends ConsumerStatefulWidget {
 
 class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
   late Map<String, String?> _mapping;
+  String? _selectedPreset;
   bool _overwrite = false;
   bool _skipDuplicates = true;
   bool _importing = false;
@@ -92,8 +221,74 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
   @override
   void initState() {
     super.initState();
-    _mapping = {for (final f in _appFields) f.key: _autoMap(f.key)};
+    _selectedPreset = _autoDetectPreset();
+    _mapping = _buildMapping(_selectedPreset);
     _preview = _computePreview();
+  }
+
+  // ─── Preset detection & application ──────────────────────────────────────
+
+  static String _norm(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[^\w]'), '');
+
+  String? _autoDetectPreset() {
+    final normHeaders = widget.fileHeaders.map(_norm).toSet();
+
+    String? best;
+    int bestScore = 2; // require at least 3 fields to match
+
+    for (final preset in _presets) {
+      int score = 0;
+      for (final patterns in preset.columns.values) {
+        final matched = patterns.any((pat) {
+          final normPat = _norm(pat);
+          return normHeaders.any((h) =>
+              h == normPat ||
+              (normPat.length >= 5 && h.contains(normPat)));
+        });
+        if (matched) score++;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = preset.id;
+      }
+    }
+    return best;
+  }
+
+  Map<String, String?> _buildMapping(String? presetId) {
+    if (presetId == null) {
+      return {for (final f in _appFields) f.key: _autoMap(f.key)};
+    }
+    final preset = _presets.firstWhere((p) => p.id == presetId);
+    return {
+      for (final f in _appFields)
+        f.key: preset.columns.containsKey(f.key)
+            ? (_matchHeader(preset.columns[f.key]!) ?? _autoMap(f.key))
+            : _autoMap(f.key),
+    };
+  }
+
+  String? _matchHeader(List<String> patterns) {
+    for (final pat in patterns) {
+      final normPat = _norm(pat);
+      for (final h in widget.fileHeaders) {
+        final normH = _norm(h);
+        if (normH == normPat ||
+            (normPat.length >= 5 && normH.contains(normPat))) {
+          return h;
+        }
+      }
+    }
+    return null;
+  }
+
+  void _selectPreset(String? presetId) {
+    setState(() {
+      _selectedPreset = presetId;
+      _mapping = _buildMapping(presetId);
+      _preview = _computePreview();
+    });
   }
 
   // ─── Auto-mapping ────────────────────────────────────────────────────────
@@ -101,11 +296,9 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
   String? _autoMap(String key) {
     final candidates = _candidates(key);
     for (final h in widget.fileHeaders) {
-      final norm =
-          h.toLowerCase().replaceAll(RegExp(r'[\s_\-\(\)\$£€#]'), '');
+      final norm = h.toLowerCase().replaceAll(RegExp(r'[\s_\-\(\)\$£€#]'), '');
       for (final c in candidates) {
         final cn = c.replaceAll(RegExp(r'[\s_\-]'), '');
-        // Exact match, or prefix match when the candidate is specific enough (≥8 chars)
         if (norm == cn || (cn.length >= 8 && norm.startsWith(cn))) return h;
       }
     }
@@ -148,13 +341,11 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
         ];
       case 'profit_loss':
         return [
-          // Specific long-form first so prefix-match picks home-currency columns
-          // over CAD-converted ones when both exist in the same file
           'netprofitlossinhomecurrency', 'netprofitlosslocalcurrency',
           'profitlossinhomecurrency', 'netprofitlosshomecurrency',
           'profitloss', 'profit_loss', 'pl', 'profit', 'loss',
           'result', 'net', 'netsession', 'netresult', 'gain',
-          'netgain', 'delta', '+/-', 'netscore', 'netprofit',
+          'netgain', 'delta', 'netscore', 'netprofit', 'netwon',
           'sessionpl', 'sessionresult', 'sessionprofit',
         ];
       case 'duration_minutes':
@@ -188,9 +379,7 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
       case 'country':
         return ['country', 'nation', 'locationcountry', 'country_played', 'jurisdiction'];
       case 'hands_per_hour':
-        return [
-          'handsperhour', 'hands_per_hour', 'hph', 'handshr', 'handrate',
-        ];
+        return ['handsperhour', 'hands_per_hour', 'hph', 'handshr', 'handrate'];
       case 'notes':
         return [
           'notes', 'note', 'comments', 'memo', 'comment',
@@ -231,10 +420,11 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
     final headers = widget.fileHeaders;
     int colIdx(String? col) => col == null ? -1 : headers.indexOf(col);
 
-    final dateIdx    = colIdx(_mapping['date']);
-    final buyInIdx   = colIdx(_mapping['buy_in']);
-    final cashOutIdx = colIdx(_mapping['cash_out']);
-    final prizeWonIdx2 = colIdx(_mapping['prize_won']);
+    final dateIdx      = colIdx(_mapping['date']);
+    final buyInIdx     = colIdx(_mapping['buy_in']);
+    final cashOutIdx   = colIdx(_mapping['cash_out']);
+    final prizeWonIdx  = colIdx(_mapping['prize_won']);
+    final plIdx        = colIdx(_mapping['profit_loss']);
 
     for (int i = 0; i < widget.rows.length; i++) {
       final row = widget.rows[i];
@@ -258,16 +448,16 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
           cell(buyInIdx).replaceAll(RegExp(r'[\$,£€₹]'), '').trim();
       if (buyInStr.isEmpty || double.tryParse(buyInStr) == null) {
         if (issues.length < 5) {
-          issues.add(_RowIssue(
-              i + 2, 'Invalid buy-in: "${cell(buyInIdx)}"'));
+          issues.add(_RowIssue(i + 2, 'Invalid buy-in: "${cell(buyInIdx)}"'));
         }
         continue;
       }
 
       final hasResult = (cashOutIdx >= 0 && cell(cashOutIdx).isNotEmpty) ||
-          (prizeWonIdx2 >= 0 && cell(prizeWonIdx2).isNotEmpty);
+          (prizeWonIdx >= 0 && cell(prizeWonIdx).isNotEmpty) ||
+          (plIdx >= 0 && cell(plIdx).isNotEmpty);
       if (!hasResult && issues.length < 5) {
-        issues.add(_RowIssue(i + 2, 'No cash-out or prize — will record \$0'));
+        issues.add(_RowIssue(i + 2, 'No result column — will record \$0 P&L'));
       }
 
       if (dateMin == null || dateStr.compareTo(dateMin) < 0) dateMin = dateStr;
@@ -287,9 +477,9 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
   // ─── Import ───────────────────────────────────────────────────────────────
 
   Future<void> _import() async {
-    // Warn if no result field is mapped
     final hasResult = _mapping['cash_out'] != null ||
-        _mapping['prize_won'] != null;
+        _mapping['prize_won'] != null ||
+        _mapping['profit_loss'] != null;
 
     if (!hasResult) {
       final confirmed = await showDialog<bool>(
@@ -297,9 +487,8 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
         builder: (_) => AlertDialog(
           title: const Text('No result column mapped'),
           content: const Text(
-            'You haven\'t mapped Cash-out or Prize Won.\n\n'
-            'All imported sessions will show \$0 P&L. '
-            'P&L is always calculated as Cash-out minus Buy-in.\n\n'
+            'You haven\'t mapped Cash-out, Prize Won, or P&L.\n\n'
+            'All imported sessions will show \$0 P&L.\n\n'
             'Import anyway?',
           ),
           actions: [
@@ -333,6 +522,7 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
       final stakesIdx    = colIdx(_mapping['stakes']);
       final cashOutIdx   = colIdx(_mapping['cash_out']);
       final prizeWonIdx  = colIdx(_mapping['prize_won']);
+      final plIdx        = colIdx(_mapping['profit_loss']);
       final durMIdx      = colIdx(_mapping['duration_minutes']);
       final durHIdx      = colIdx(_mapping['duration_hours']);
       final startIdx     = colIdx(_mapping['start_time']);
@@ -347,7 +537,6 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
       final teIdx        = colIdx(_mapping['total_entrants']);
       final tqIdx        = colIdx(_mapping['table_quality']);
 
-      // Load existing sessions for duplicate detection
       Set<String>? existingKeys;
       if (_skipDuplicates && !_overwrite) {
         final existing = await service.watchAllSessions().first;
@@ -372,55 +561,41 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
             cell(buyInIdx).replaceAll(RegExp(r'[\$,£€₹]'), '').trim();
         final buyIn = double.tryParse(buyInStr) ?? 0;
 
-        // Duplicate check
         if (existingKeys != null) {
           final key = '${dateStr}_${buyIn.toStringAsFixed(2)}';
           if (existingKeys.contains(key)) continue;
         }
 
         // Game type
-        final gameTypeRaw = cell(gameTypeIdx).toLowerCase().trim();
-        String gameType = 'cash';
-        if (gameTypeRaw.contains('tournament') ||
-            gameTypeRaw == 'mtt' ||
-            gameTypeRaw == 'tourney' ||
-            gameTypeRaw == 'plo tournament') {
-          gameType = 'tournament';
-        } else if (gameTypeRaw.contains('sit') ||
-            gameTypeRaw.contains('sng') ||
-            gameTypeRaw.contains('s&g')) {
-          gameType = 'sit_and_go';
-        }
+        final gameType = _normalizeGameType(cell(gameTypeIdx));
 
-        // Stakes — defaults gracefully
+        // Stakes
         final stakesRaw = cell(stakesIdx).trim();
         final stakes = stakesRaw.isNotEmpty
             ? stakesRaw
             : isTournamentType(gameType) ? 'N/A' : 'Cash';
 
-        // Location — must come before currency so country inference works
-        final location =
-            locationIdx >= 0 && cell(locationIdx).isNotEmpty
-                ? cell(locationIdx)
-                : null;
+        // Location (before currency so country inference works)
+        final location = locationIdx >= 0 && cell(locationIdx).isNotEmpty
+            ? cell(locationIdx)
+            : null;
 
-        // Country: explicit column → infer from location room lookup
+        // Country
         String? country;
         if (countryIdx >= 0 && cell(countryIdx).isNotEmpty) {
           country = cell(countryIdx);
         } else if (location != null) {
           country = countryFromLocation(location);
-          // Also try matching by room name (for plain site names like "PokerBaazi")
           if (country == null) {
             final locLower = location.toLowerCase();
-            final match = kPokerRooms.where(
-              (r) => r.name.toLowerCase() == locLower,
-            ).firstOrNull;
+            final match = kPokerRooms
+                .where((r) => r.name.toLowerCase() == locLower)
+                .firstOrNull;
             country = match?.country;
           }
         }
 
-        // Currency priority: explicit column → country inference → room lookup → online default → CAD
+        // Currency
         const validCurrencies = ['CAD', 'USD', 'GBP', 'EUR', 'AUD', 'NZD', 'INR'];
         String currency;
         final currencyRaw =
@@ -432,7 +607,6 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
           if (fromCountry != null) {
             currency = fromCountry;
           } else if (location != null) {
-            // Try room-specific currency from the location/room name
             final locLower = location.toLowerCase();
             final roomCurrency = kPokerRooms
                 .where((r) =>
@@ -452,38 +626,44 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
           }
         }
 
-        // Prize won
+        // P&L from file (used to derive cash-out when cash-out is absent)
+        final plRaw = plIdx >= 0 && cell(plIdx).isNotEmpty
+            ? double.tryParse(
+                cell(plIdx)
+                    .replaceAll(RegExp(r'[\$£€₹,\s]'), '')
+                    .replaceAll('+', ''))
+            : null;
+
+        // Cash out / prize
+        final cashOutRaw = cashOutIdx >= 0
+            ? double.tryParse(
+                cell(cashOutIdx).replaceAll(RegExp(r'[\$,£€₹]'), ''))
+            : null;
         final prizeWonRaw = prizeWonIdx >= 0
             ? double.tryParse(
                 cell(prizeWonIdx).replaceAll(RegExp(r'[\$,£€₹]'), ''))
             : null;
 
-        // Cash out
-        final cashOutRaw = cashOutIdx >= 0
-            ? double.tryParse(
-                cell(cashOutIdx).replaceAll(RegExp(r'[\$,£€₹]'), ''))
-            : null;
-
-        // For tournaments: prize_won column first, then cash_out column
-        // (many tracking files use a single "Cash Out" column for both).
-        // P&L is always calculated as cashOut - buyIn; never read from file.
-        double cashOut = isTournamentType(gameType)
-            ? (prizeWonRaw ?? cashOutRaw ?? 0)
-            : (cashOutRaw ?? 0);
+        // Derive cash-out from P&L if cash-out column is absent
+        double cashOut;
+        if (isTournamentType(gameType)) {
+          cashOut = prizeWonRaw ??
+              cashOutRaw ??
+              (plRaw != null ? buyIn + plRaw : 0);
+        } else {
+          cashOut = cashOutRaw ?? (plRaw != null ? buyIn + plRaw : 0);
+        }
 
         final double pl = cashOut - buyIn;
 
-        // Duration
+        // Duration — handles "1h 30m", "1:30", "1:30:00", decimal hours, plain minutes
         int durationMinutes = 0;
         if (durMIdx >= 0 && cell(durMIdx).isNotEmpty) {
-          durationMinutes = int.tryParse(
-                  cell(durMIdx).replaceAll(RegExp(r'[^\d]'), '')) ??
-              0;
+          durationMinutes =
+              _parseDurationToMinutes(cell(durMIdx), isHours: false);
         } else if (durHIdx >= 0 && cell(durHIdx).isNotEmpty) {
-          final hoursStr =
-              cell(durHIdx).replaceAll(RegExp(r'[hH\s]'), '').trim();
-          final hours = double.tryParse(hoursStr) ?? 0;
-          durationMinutes = (hours * 60).round();
+          durationMinutes =
+              _parseDurationToMinutes(cell(durHIdx), isHours: true);
         } else if (startIdx >= 0 && endIdx >= 0) {
           durationMinutes = calcDurationMinutes(
             _normalizeTime(cell(startIdx)),
@@ -497,6 +677,7 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
         final endTime = endIdx >= 0 && cell(endIdx).isNotEmpty
             ? _normalizeTime(cell(endIdx))
             : '00:00';
+
         final notes =
             notesIdx >= 0 && cell(notesIdx).isNotEmpty ? cell(notesIdx) : null;
         final rake = rakeIdx >= 0 && cell(rakeIdx).isNotEmpty
@@ -566,8 +747,65 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
 
   // ─── Parsing helpers ──────────────────────────────────────────────────────
 
+  String _normalizeGameType(String raw) {
+    final s = raw.toLowerCase().trim();
+    if (s.isEmpty) return 'cash';
+
+    // Tournament
+    if (s.contains('tournament') ||
+        s == 'mtt' || s.startsWith('mtt ') || s.startsWith('mtt-') ||
+        s == 'tourney' || s == 'multi-table' || s.contains('multitable') ||
+        s.contains('bounty') || s.contains('knockout') || s.contains('pko') ||
+        s.contains('satellite') || s.contains('shootout')) {
+      return 'tournament';
+    }
+
+    // Sit & Go (including Spin & Go, Jackpot)
+    if (s.contains('sit') ||
+        s.contains('sng') || s.contains('s&g') ||
+        s.contains('spin') || s.contains('jackpot') ||
+        s == 'hyper' || s.contains('hyper-turbo') ||
+        s == 'turbo sng' || s == 'double or nothing') {
+      return 'sit_and_go';
+    }
+
+    return 'cash';
+  }
+
+  int _parseDurationToMinutes(String raw, {required bool isHours}) {
+    final s = raw.trim();
+    if (s.isEmpty) return 0;
+
+    // "2h 30m", "2h30m", "2 hr 30 min", "2hours 30mins", "2h", "30m"
+    final hm = RegExp(
+      r'(\d+)\s*h(?:rs?|ours?)?\s*(?:(\d+)\s*m(?:ins?|inutes?)?)?',
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (hm != null) {
+      return int.parse(hm.group(1)!) * 60 +
+          (int.tryParse(hm.group(2) ?? '') ?? 0);
+    }
+
+    // "45m", "45 min", "45 minutes" (pure minutes, no hours part)
+    final mOnly = RegExp(
+      r'^(\d+)\s*m(?:ins?|inutes?)?$',
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (mOnly != null) return int.parse(mOnly.group(1)!);
+
+    // "1:30" or "1:30:00" — leading segment is hours
+    final hms = RegExp(r'^(\d+):(\d{2})(?::(\d{2}))?$').firstMatch(s);
+    if (hms != null) {
+      return int.parse(hms.group(1)!) * 60 + int.parse(hms.group(2)!);
+    }
+
+    // Plain number — context determines unit
+    final n = double.tryParse(s.replaceAll(RegExp(r'[^\d.]'), ''));
+    if (n == null) return 0;
+    return isHours ? (n * 60).round() : n.round();
+  }
+
   String? _parseDate(String raw) {
-    // Strip leading day names: "Mon, ", "Monday "
     final cleaned = raw
         .replaceAll(
             RegExp(
@@ -576,14 +814,9 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
             '')
         .trim();
 
-    // Excel serial date numbers (e.g. "45365" or "45365.0").
-    // These appear when the excel package loses the date numFmt after patching.
-    // Valid range: ~36526 (Jan 1, 2000) to ~73050 (Jan 1, 2100).
     final asNum = double.tryParse(cleaned);
     if (asNum != null && asNum >= 36526 && asNum <= 73050) {
       final serial = asNum.truncate();
-      // Excel counts 1900 as a leap year (it isn't). For serials > 59, subtract
-      // 1 to skip the phantom Feb 29, 1900 that Excel incorrectly includes.
       final effectiveDays = serial > 59 ? serial - 1 : serial;
       final dt = DateTime.utc(1899, 12, 30).add(Duration(days: effectiveDays));
       return '${dt.year.toString().padLeft(4, '0')}-'
@@ -603,9 +836,6 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
             .format(DateFormat(fmt).parseStrict(cleaned));
       } catch (_) {}
     }
-    // ISO 8601 (e.g. "2024-03-14T00:00:00.000Z" from DateCellValue.toString()).
-    // Always extract the UTC calendar date to avoid midnight UTC → previous day
-    // in local timezone.
     try {
       final dt = DateTime.parse(cleaned).toUtc();
       return '${dt.year.toString().padLeft(4, '0')}-'
@@ -645,6 +875,10 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
       ),
     ];
 
+    final detectedPreset = _selectedPreset != null
+        ? _presets.firstWhere((p) => p.id == _selectedPreset).name
+        : null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Map Columns')),
       body: Column(
@@ -663,7 +897,44 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
                         color: Theme.of(context).colorScheme.outline,
                       ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+
+                // ── Source App preset chips ──────────────────────────────────
+                Row(
+                  children: [
+                    Text('Source App',
+                        style: Theme.of(context).textTheme.labelMedium),
+                    if (detectedPreset != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '(auto-detected: $detectedPreset)',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _PresetChip(
+                        label: 'Auto',
+                        selected: _selectedPreset == null,
+                        onTap: () => _selectPreset(null),
+                      ),
+                      for (final p in _presets)
+                        _PresetChip(
+                          label: p.name,
+                          selected: _selectedPreset == p.id,
+                          onTap: () => _selectPreset(p.id),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
 
                 // ── Data preview ─────────────────────────────────────────────
                 if (widget.rows.isNotEmpty) ...[
@@ -827,6 +1098,32 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Preset chip ─────────────────────────────────────────────────────────────
+
+class _PresetChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PresetChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
       ),
     );
   }

@@ -373,7 +373,7 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
                   icon: Icons.upload_file_outlined,
                   title: 'Import from CSV or Excel',
                   subtitle:
-                      'Pick any .csv or .xlsx file. You\'ll map your columns to app fields before importing.',
+                      'Supports Poker Income, BankrollMob, Simply Poker, Poker Analytics, Poker Journal, PokerTracker 4, and any custom CSV or Excel export.',
                   onTap: _pickAndImport,
                 ),
                 const SizedBox(height: 24),
@@ -404,9 +404,10 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
+                        '• Known app formats are auto-detected — or pick your app manually\n'
                         '• Only Date and Buy-in are required — everything else is optional\n'
-                        '• P&L is always calculated as Cash-out − Buy-in (no P&L column needed)\n'
-                        '• Duration can be in minutes or hours — both are recognised\n'
+                        '• If your file has only a P&L column (no Cash-out), cash-out is derived automatically\n'
+                        '• Duration accepts minutes, decimal hours, "1h 30m", "1:30", and more\n'
                         '• CSV files with comma, semicolon, or tab delimiters are auto-detected\n'
                         '• Excel files with multiple sheets: you\'ll be asked which sheet to use\n'
                         '• Duplicate sessions (same date + buy-in) are skipped by default',
