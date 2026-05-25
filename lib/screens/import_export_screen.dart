@@ -373,7 +373,7 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
                   icon: Icons.upload_file_outlined,
                   title: 'Import from CSV or Excel',
                   subtitle:
-                      'Supports Poker Income, BankrollMob, Simply Poker, Poker Analytics, Poker Journal, PokerTracker 4, and any custom CSV or Excel export.',
+                      'Auto-detects: Poker Income, BankrollMob, Simply Poker, Poker Analytics, Poker Journal, PokerBase, Splendid Poker, My Poker Log, Poker Sessions, PokerTracker 4, Hold\'em Manager 3, Hand2Note, DriveHUD, Poker Copilot, Sharkscope, PokerStars History — or any custom CSV / Excel.',
                   onTap: _pickAndImport,
                 ),
                 const SizedBox(height: 24),

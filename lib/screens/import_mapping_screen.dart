@@ -53,6 +53,7 @@ class _Preset {
 }
 
 const _presets = [
+  // ── TableLab own export ──────────────────────────────────────────────────
   _Preset(
     id: 'tablelab',
     name: 'TableLab',
@@ -77,15 +78,21 @@ const _presets = [
       'table_quality':    ['table_quality'],
     },
   ),
+
+  // ── Mobile / web bankroll tracking apps ──────────────────────────────────
+
+  // Confirmed columns: game format, stake, location, time, profit, notes
   _Preset(
     id: 'poker_income',
     name: 'Poker Income',
     columns: {
       'date':           ['date'],
-      'game_type':      ['game type', 'gametype', 'type'],
-      'stakes':         ['stakes', 'game name', 'level'],
+      'game_type':      ['game format', 'game type', 'gametype', 'format', 'type'],
+      'stakes':         ['stake', 'stakes', 'game name', 'level'],
       'buy_in':         ['buy-in', 'buyin', 'buy in', 'investment'],
       'cash_out':       ['cash out', 'cashout', 'cash-out', 'winnings'],
+      'profit_loss':    ['profit', 'net', 'result'],
+      'start_time':     ['time', 'start time', 'session start'],
       'duration_hours': ['duration (hours)', 'duration', 'hours played', 'session length', 'length'],
       'location':       ['location', 'venue', 'casino', 'room'],
       'notes':          ['notes', 'note', 'comments'],
@@ -149,6 +156,69 @@ const _presets = [
       'notes':          ['notes', 'session notes', 'memo'],
     },
   ),
+  // Confirmed columns: date, location, expense (=buy_in), currency, profit (=P&L)
+  // Optional manual columns: buyin, cashout, type, game, limit
+  _Preset(
+    id: 'pokerbase',
+    name: 'PokerBase',
+    columns: {
+      'date':        ['date'],
+      'buy_in':      ['expense', 'buyin', 'buy-in', 'buy in'],
+      'game_type':   ['type', 'game', 'game type'],
+      'stakes':      ['limit', 'stakes', 'game', 'blinds'],
+      'cash_out':    ['cashout', 'cash out', 'cash-out'],
+      'profit_loss': ['profit', 'net', 'result', 'profit/loss'],
+      'location':    ['location', 'venue', 'casino'],
+      'currency':    ['currency'],
+      'notes':       ['notes'],
+    },
+  ),
+  _Preset(
+    id: 'splendid_poker',
+    name: 'Splendid Poker',
+    columns: {
+      'date':           ['date'],
+      'game_type':      ['game type', 'type'],
+      'stakes':         ['stakes', 'blinds'],
+      'buy_in':         ['buy-in', 'buyin', 'buy in'],
+      'cash_out':       ['cash out', 'cashout', 'cash-out'],
+      'duration_hours': ['duration', 'session length', 'length'],
+      'location':       ['venue', 'location', 'casino'],
+      'notes':          ['notes', 'tags'],
+    },
+  ),
+  _Preset(
+    id: 'my_poker_log',
+    name: 'My Poker Log',
+    columns: {
+      'date':           ['date'],
+      'game_type':      ['type', 'game', 'game type'],
+      'stakes':         ['stakes', 'blinds', 'level'],
+      'buy_in':         ['buy-in', 'buyin', 'buy in'],
+      'cash_out':       ['cash-out', 'cashout', 'cash out'],
+      'duration_hours': ['duration', 'hours', 'session length', 'length'],
+      'location':       ['venue', 'location', 'casino', 'room'],
+      'notes':          ['notes', 'memo'],
+    },
+  ),
+  _Preset(
+    id: 'poker_sessions',
+    name: 'Poker Sessions',
+    columns: {
+      'date':           ['date'],
+      'game_type':      ['game type', 'game', 'type'],
+      'stakes':         ['stakes', 'blinds', 'limit'],
+      'buy_in':         ['buy-in', 'buyin', 'buy in'],
+      'cash_out':       ['cash out', 'cashout', 'cash-out'],
+      'duration_hours': ['duration (hrs)', 'duration', 'hours', 'session length', 'length'],
+      'location':       ['venue', 'location', 'casino', 'room'],
+      'notes':          ['notes', 'comments'],
+    },
+  ),
+
+  // ── Desktop HUD / tracking software ──────────────────────────────────────
+  // These export P&L (Net Won), not cash-out — cash-out is derived automatically.
+
   _Preset(
     id: 'pokertracker',
     name: 'PokerTracker 4',
@@ -164,6 +234,90 @@ const _presets = [
       'end_time':         ['session end time', 'end time', 'end'],
       'location':         ['table', 'room', 'site', 'location'],
       'notes':            ['notes'],
+    },
+  ),
+  _Preset(
+    id: 'hm3',
+    name: "Hold'em Manager 3",
+    columns: {
+      'date':             ['session date', 'date', 'start date', 'start time', 'session start'],
+      'game_type':        ['game type', 'game', 'type', 'limit type'],
+      'stakes':           ['stakes', 'blinds', 'limit', 'game'],
+      'profit_loss':      ['net won', 'net won (usd)', 'net won (\$)', 'net amount', 'net'],
+      'duration_minutes': ['duration (min)', 'duration', 'session length (min)', 'length (min)'],
+      'location':         ['site', 'network', 'room', 'poker site'],
+      'notes':            ['notes'],
+    },
+  ),
+  _Preset(
+    id: 'hand2note',
+    name: 'Hand2Note',
+    columns: {
+      'date':             ['date', 'session date'],
+      'game_type':        ['game type', 'game', 'type'],
+      'stakes':           ['stakes', 'blinds', 'level'],
+      'profit_loss':      ['net won', 'net won (\$)', 'net', 'won', 'profit'],
+      'duration_minutes': ['duration (min)', 'duration', 'minutes', 'session length'],
+      'location':         ['site', 'room', 'network'],
+      'notes':            ['notes'],
+    },
+  ),
+  _Preset(
+    id: 'drivehud',
+    name: 'DriveHUD',
+    columns: {
+      'date':             ['date', 'session date', 'start date'],
+      'game_type':        ['game type', 'game', 'type'],
+      'stakes':           ['stakes', 'blinds', 'limit'],
+      'profit_loss':      ['net won', 'net', 'profit', 'win/loss'],
+      'duration_minutes': ['duration (min)', 'duration', 'session length', 'length'],
+      'location':         ['site', 'room', 'network', 'location'],
+      'notes':            ['notes'],
+    },
+  ),
+  _Preset(
+    id: 'poker_copilot',
+    name: 'Poker Copilot',
+    columns: {
+      'date':             ['date', 'session date', 'start'],
+      'game_type':        ['game type', 'game', 'type'],
+      'stakes':           ['stakes', 'blinds', 'small blind'],
+      'profit_loss':      ['net won', 'net', 'profit', 'winnings', 'won'],
+      'duration_minutes': ['duration', 'duration (min)', 'session length'],
+      'location':         ['site', 'room', 'network', 'location'],
+      'notes':            ['notes'],
+    },
+  ),
+
+  // ── Tournament result databases ───────────────────────────────────────────
+  // These export tournament history (no cash-out; use prize_won + finish_position).
+
+  _Preset(
+    id: 'sharkscope',
+    name: 'Sharkscope',
+    columns: {
+      'date':            ['date', 'finished', 'tournament date', 'end date'],
+      'buy_in':          ['buy-in', 'stake', 'entry fee', 'entry', 'buyin'],
+      'prize_won':       ['prize', 'winnings', 'payout', 'won', 'prize won'],
+      'profit_loss':     ['profit', 'net', 'profit/loss', 'result'],
+      'finish_position': ['position', 'finish', 'place', 'final position'],
+      'total_entrants':  ['entries', 'entrants', 'field size', 'players', 'total'],
+      'location':        ['site', 'network', 'poker site'],
+      'notes':           ['tournament', 'event', 'tournament name', 'name'],
+    },
+  ),
+  _Preset(
+    id: 'pokerstars_history',
+    name: 'PokerStars History',
+    columns: {
+      'date':            ['date', 'tournament date', 'finish date', 'start date'],
+      'buy_in':          ['buy-in', 'total buy-in', 'entry', 'buyin'],
+      'prize_won':       ['prize', 'winnings', 'payout', 'won'],
+      'profit_loss':     ['profit', 'net', 'profit/loss'],
+      'finish_position': ['position', 'finish', 'place', 'finishing position'],
+      'total_entrants':  ['entries', 'entrants', 'field', 'players', 'registered'],
+      'location':        ['site', 'tournament name', 'event', 'game name'],
+      'stakes':          ['buy-in', 'level', 'stake'],
     },
   ),
 ];
@@ -316,7 +470,7 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
         return [
           'buyin', 'buy_in', 'cashin', 'cash_in', 'investment', 'entry',
           'entryamount', 'buyin\$', 'buyinfee', 'buyinamount',
-          'totalbuyin', 'totalinvestment',
+          'totalbuyin', 'totalinvestment', 'expense',
         ];
       case 'game_type':
         return [
@@ -362,7 +516,7 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
       case 'start_time':
         return [
           'starttime', 'start_time', 'start', 'startsat', 'timestart',
-          'began', 'begin', 'startedsat',
+          'began', 'begin', 'startedsat', 'time',
         ];
       case 'end_time':
         return [
@@ -566,8 +720,17 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
           if (existingKeys.contains(key)) continue;
         }
 
-        // Game type
-        final gameType = _normalizeGameType(cell(gameTypeIdx));
+        // Game type — infer tournament when tournament-specific columns are
+        // mapped but the file has no explicit game_type column (e.g. Sharkscope,
+        // PokerStars tournament history exports).
+        final String gameType;
+        if (gameTypeIdx >= 0 && cell(gameTypeIdx).isNotEmpty) {
+          gameType = _normalizeGameType(cell(gameTypeIdx));
+        } else if (prizeWonIdx >= 0 || fpIdx >= 0 || teIdx >= 0) {
+          gameType = 'tournament';
+        } else {
+          gameType = 'cash';
+        }
 
         // Stakes
         final stakesRaw = cell(stakesIdx).trim();
