@@ -49,6 +49,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
   int? _tableQuality;
   bool _rakePresetLoaded = false;
   bool _submitted = false;
+  bool _saving = false;
 
   double? _livePL;
   late int _liveDuration;
@@ -231,6 +232,8 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
     setState(() => _submitted = true);
     if (_locationName.isEmpty) return;
     if (!_formKey.currentState!.validate()) return;
+    if (_saving) return;
+    setState(() => _saving = true);
 
     final stakesVal = _isTournament
         ? 'N/A'
@@ -260,12 +263,6 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
     final teText = _totalEntrantsCtrl.text.trim();
     final hphText = _handsPerHourCtrl.text.trim();
 
-    final service = ref.read(supabaseServiceProvider);
-
-    if (rakeValue != null && _locationName.isNotEmpty) {
-      await service.upsertRakePreset(_locationName, _gameType, stakesVal, rakeValue);
-    }
-
     final data = {
       'date': dateStr,
       'stakes': stakesVal,
@@ -289,13 +286,25 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
       'country': _country,
     };
 
-    if (widget.session == null) {
-      await service.insertSession(data);
-    } else {
-      await service.updateSession(widget.session!.id, data);
+    final service = ref.read(supabaseServiceProvider);
+    try {
+      if (rakeValue != null && _locationName.isNotEmpty) {
+        await service.upsertRakePreset(_locationName, _gameType, stakesVal, rakeValue);
+      }
+      if (widget.session == null) {
+        await service.insertSession(data);
+      } else {
+        await service.updateSession(widget.session!.id, data);
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save session: $e')),
+        );
+      }
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -667,10 +676,15 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
             const SizedBox(height: 24),
 
             ElevatedButton(
-              onPressed: _save,
+              onPressed: _saving ? null : _save,
               style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48)),
-              child: const Text('Save Session'),
+              child: _saving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save Session'),
             ),
           ],
         ),

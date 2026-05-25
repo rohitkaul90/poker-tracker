@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 int calcDurationMinutes(String startTime, String endTime) {
   final start = _timeToMinutes(startTime);
   final end = _timeToMinutes(endTime);
+  if (start < 0 || end < 0) return 0;
   int diff = end - start;
   if (diff < 0) diff += 24 * 60;
   return diff;
@@ -10,7 +11,11 @@ int calcDurationMinutes(String startTime, String endTime) {
 
 int _timeToMinutes(String time) {
   final parts = time.split(':');
-  return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+  if (parts.length < 2) return -1;
+  final h = int.tryParse(parts[0]);
+  final m = int.tryParse(parts[1]);
+  if (h == null || m == null) return -1;
+  return h * 60 + m;
 }
 
 String formatDuration(int minutes) {

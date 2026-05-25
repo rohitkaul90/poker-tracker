@@ -1,22 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/session_model.dart';
+import 'supabase_retry.dart';
 
 class SupabaseService {
   final _client = Supabase.instance.client;
 
   String? get _uid => _client.auth.currentUser?.id;
-
-  Future<T> _withRetry<T>(Future<T> Function() fn) async {
-    try {
-      return await fn();
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST303') {
-        await _client.auth.refreshSession();
-        return fn();
-      }
-      rethrow;
-    }
-  }
 
   Stream<List<SessionModel>> watchAllSessions() {
     final uid = _uid;
@@ -39,7 +28,7 @@ class SupabaseService {
   Future<void> insertSession(Map<String, dynamic> data) {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    return _withRetry(() => _client.from('sessions').insert({...data, 'user_id': uid}));
+    return withSupabaseRetry(() => _client.from('sessions').insert({...data, 'user_id': uid}));
   }
 
   Future<void> bulkInsertSessions(List<Map<String, dynamic>> sessions) {
@@ -47,27 +36,27 @@ class SupabaseService {
     if (uid == null) throw Exception('Not authenticated');
     if (sessions.isEmpty) return Future.value();
     final withUser = sessions.map((s) => {...s, 'user_id': uid}).toList();
-    return _withRetry(() => _client.from('sessions').insert(withUser));
+    return withSupabaseRetry(() => _client.from('sessions').insert(withUser));
   }
 
   Future<void> updateSession(String id, Map<String, dynamic> data) {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    return _withRetry(() =>
+    return withSupabaseRetry(() =>
         _client.from('sessions').update(data).eq('id', id).eq('user_id', uid));
   }
 
   Future<void> deleteSession(String id) {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    return _withRetry(() =>
+    return withSupabaseRetry(() =>
         _client.from('sessions').delete().eq('id', id).eq('user_id', uid));
   }
 
   Future<void> clearAllSessions() {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    return _withRetry(() =>
+    return withSupabaseRetry(() =>
         _client.from('sessions').delete().eq('user_id', uid));
   }
 
@@ -75,7 +64,7 @@ class SupabaseService {
       String location, String gameType, String stakes) {
     final uid = _uid;
     if (uid == null) return Future.value(null);
-    return _withRetry(() => _client
+    return withSupabaseRetry(() => _client
         .from('rake_presets')
         .select()
         .eq('user_id', uid)
@@ -89,7 +78,7 @@ class SupabaseService {
       String location, String gameType, String stakes, double amount) {
     final uid = _uid;
     if (uid == null) return Future.value();
-    return _withRetry(() => _client.from('rake_presets').upsert({
+    return withSupabaseRetry(() => _client.from('rake_presets').upsert({
       'user_id': uid,
       'location': location,
       'game_type': gameType,

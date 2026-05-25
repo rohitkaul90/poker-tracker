@@ -119,9 +119,14 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
 
     try {
       await widget.onSaved(_labelCtrl.text.trim(), _tags.toList(), note);
-      if (mounted) { Navigator.pop(context); }
-    } catch (_) {
-      if (mounted) { setState(() => _saving = false); }
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
     }
   }
 

@@ -119,8 +119,16 @@ class _ReadDetailScreenState extends ConsumerState<ReadDetailScreen> {
       ),
     );
     if (confirmed == true) {
-      await ref.read(readsServiceProvider).deleteNote(note.id);
-      _loadNotes();
+      try {
+        await ref.read(readsServiceProvider).deleteNote(note.id);
+        _loadNotes();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: $e')),
+          );
+        }
+      }
     }
   }
 

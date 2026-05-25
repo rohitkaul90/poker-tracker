@@ -1,23 +1,15 @@
 import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/hand_model.dart';
+import 'supabase_retry.dart';
 
 class HandService {
   SupabaseClient get _client => Supabase.instance.client;
-  String get _uid => _client.auth.currentUser!.id;
 
-  // PGRST303 = "JWT issued at future" — device clock is slightly ahead of the
-  // Supabase server. Refreshing forces a new token timed to the server clock.
-  Future<T> _withRetry<T>(Future<T> Function() fn) async {
-    try {
-      return await fn();
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST303') {
-        await _client.auth.refreshSession();
-        return fn();
-      }
-      rethrow;
-    }
+  String get _uid {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not authenticated');
+    return uid;
   }
 
   static String _uuid() {
@@ -30,7 +22,7 @@ class HandService {
         '${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
   }
 
-  Future<List<PokerHand>> fetchHands() => _withRetry(() async {
+  Future<List<PokerHand>> fetchHands() => withSupabaseRetry(() async {
     final rows = await _client
         .from('hands')
         .select()
@@ -54,7 +46,7 @@ class HandService {
     required List<StreetData> streets,
     String? sessionId,
     String? notes,
-  }) => _withRetry(() async {
+  }) => withSupabaseRetry(() async {
     final id = _uuid();
     final now = DateTime.now();
     final hand = PokerHand(
@@ -77,7 +69,7 @@ class HandService {
     return hand;
   });
 
-  Future<void> deleteHand(String handId) => _withRetry(() async {
+  Future<void> deleteHand(String handId) => withSupabaseRetry(() async {
     await _client
         .from('hands')
         .delete()
