@@ -1,5 +1,7 @@
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/poker_rooms.dart';
@@ -82,9 +84,9 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
   String get _effectiveCurrency {
     if (widget.displayCurrency != null) return widget.displayCurrency!;
     if (widget.sessions.isEmpty) return 'CAD';
-    final sorted = [...widget.sessions]
-      ..sort((a, b) => b.date.compareTo(a.date));
-    return sorted.first.currency;
+    return widget.sessions
+        .reduce((a, b) => a.date.compareTo(b.date) >= 0 ? a : b)
+        .currency;
   }
 
   List<SessionModel> get _filtered {
@@ -99,8 +101,10 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
       };
       if (days > 0) {
         final cutoff = DateTime.now().subtract(Duration(days: days));
-        result =
-            result.where((s) => DateTime.parse(s.date).isAfter(cutoff)).toList();
+        result = result.where((s) {
+          final d = DateTime.tryParse(s.date);
+          return d != null && d.isAfter(cutoff);
+        }).toList();
       }
     }
     if (widget.countryFilter != null) {
@@ -125,223 +129,321 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
     return result;
   }
 
-  List<SessionModel> get _sorted =>
-      [..._filtered]..sort((a, b) => a.date.compareTo(b.date));
-
+  // Intentionally check ALL sessions (unfiltered) so the game-type chip strip
+  // doesn't vanish when the active filter hides one type.
   bool get _hasCash => widget.sessions.any((s) => s.gameType == 'cash');
   bool get _hasTournament =>
       widget.sessions.any((s) => isTournamentType(s.gameType));
-  bool get _hasOnline =>
-      widget.sessions.any((s) => isOnlineSession(s.location));
-  bool get _hasLive =>
-      widget.sessions.any((s) => !isOnlineSession(s.location));
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    final sorted = _sorted;
+    final sorted = [...filtered]..sort((a, b) => a.date.compareTo(b.date));
     final displayCurrency = _effectiveCurrency;
     final showingTournaments = filtered.any((s) => isTournamentType(s.gameType));
     final showingCash = filtered.any((s) => s.gameType == 'cash');
+    // Use filtered counts for insight-card visibility (not all-time counts).
+    final hasLiveInView = filtered.any((s) => !isOnlineSession(s.location));
+    final hasOnlineInView = filtered.any((s) => isOnlineSession(s.location));
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-      children: [
-        // ── Game-type chip strip ───────────────────────────────────────────
-        if (_hasCash && _hasTournament) ...[
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final entry in [
-                  (null, 'All'),
-                  ('cash', 'Cash'),
-                  ('tournament', 'Tournament'),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(entry.$2),
-                      selected: _gameFilter == entry.$1,
-                      onSelected: (_) =>
-                          setState(() => _gameFilter = entry.$1),
-                    ),
-                  ),
-              ],
+    // ── Summary stats for pinned header ──────────────────────────────────────
+    double toD(double amount, String from) =>
+        convertCurrency(amount, from, displayCurrency);
+    final sym = currencySymbol(displayCurrency);
+    final totalHours =
+        filtered.fold(0, (s, e) => s + e.durationMinutes) / 60.0;
+    final totalPL =
+        filtered.fold(0.0, (sum, s) => sum + toD(s.profitLoss, s.currency));
+    final totalBuyIn =
+        filtered.fold(0.0, (sum, s) => sum + toD(s.buyIn, s.currency));
+    final hourlyRate = totalHours > 0 ? totalPL / totalHours : 0.0;
+    final rateColor = hourlyRate >= 0 ? Colors.green : Colors.red;
+    final plColor = totalPL >= 0 ? Colors.green : Colors.red;
+    final tSessions =
+        filtered.where((s) => isTournamentType(s.gameType)).toList();
+    final hasTournaments = tSessions.isNotEmpty;
+    final tournamentROI = hasTournaments
+        ? tSessions.fold(
+                0.0,
+                (sum, s) =>
+                    sum + (s.buyIn > 0 ? s.profitLoss / s.buyIn * 100 : 0.0)) /
+            tSessions.length
+        : null;
+    final itmCount = hasTournaments
+        ? tSessions
+            .where((s) => isSessionItm(s.prizeWon, s.profitLoss))
+            .length
+        : null;
+    final itmPct = (itmCount != null && tSessions.isNotEmpty)
+        ? (itmCount / tSessions.length * 100).round()
+        : null;
+    final rateSign = hourlyRate >= 0 ? '+' : '-';
+    final cashSessions = filtered.where((s) => s.gameType == 'cash').toList();
+    final bb100 = calcBB100(cashSessions);
+
+    final summaryItems = <_SummaryItem>[
+      _SummaryItem('Sessions', '${filtered.length}'),
+      _SummaryItem('Hours', '${totalHours.toStringAsFixed(1)}h'),
+      _SummaryItem(
+        'Win Rate',
+        '$rateSign$sym${hourlyRate.abs().toStringAsFixed(0)}/hr',
+        rateColor,
+      ),
+      _SummaryItem(
+        'Total P&L',
+        formatPLWithCurrency(totalPL, displayCurrency),
+        plColor,
+      ),
+      _SummaryItem('Buy-In', formatAmount(totalBuyIn, displayCurrency)),
+      if (bb100 != null)
+        _SummaryItem(
+          'BB/100',
+          formatBB100(bb100),
+          bb100 >= 0 ? Colors.green : Colors.red,
+        ),
+      if (tournamentROI != null)
+        _SummaryItem(
+          'Tourn. ROI',
+          formatROI(tournamentROI),
+          tournamentROI >= 0 ? Colors.green : Colors.red,
+        ),
+      if (itmPct != null) _SummaryItem('ITM', '$itmPct%'),
+    ];
+
+    return CustomScrollView(
+      slivers: [
+        // ── Game-type chip strip (scrolls away) ───────────────────────────
+        if (_hasCash && _hasTournament)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final entry in [
+                      (null, 'All'),
+                      ('cash', 'Cash'),
+                      ('tournament', 'Tournament'),
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(entry.$2),
+                          selected: _gameFilter == entry.$1,
+                          onSelected: (_) =>
+                              setState(() => _gameFilter = entry.$1),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-        ],
 
         if (filtered.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(32),
+          const SliverFillRemaining(
             child: Center(child: Text('No sessions match this filter.')),
           )
         else ...[
-          _StatsCard(sessions: filtered, displayCurrency: displayCurrency),
-          const SizedBox(height: 16),
+          // ── Compact pinned summary ─────────────────────────────────────
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SummaryDelegate(items: summaryItems),
+          ),
 
-          // Recommendations (collapsible)
-          InkWell(
-            onTap: () => setState(() => _recsExpanded = !_recsExpanded),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(child: _sectionHeader(context, 'Recommendations')),
-                  Icon(
-                    _recsExpanded ? Icons.expand_less : Icons.expand_more,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.outline,
+          // ── Charts and insight cards ───────────────────────────────────
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+            sliver: SliverList.list(
+              children: [
+                // Recommendations (collapsible)
+                InkWell(
+                  onTap: () =>
+                      setState(() => _recsExpanded = !_recsExpanded),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                            child: _sectionHeader(
+                                context, 'Recommendations')),
+                        Icon(
+                          _recsExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_recsExpanded) ...[
+                  const SizedBox(height: 8),
+                  if (_gameFilter == null &&
+                      showingCash &&
+                      showingTournaments) ...[
+                    _RecommendationsCard(
+                      sessions: filtered
+                          .where((s) => s.gameType == 'cash')
+                          .toList(),
+                      gameLabel: 'cash',
+                      displayCurrency: displayCurrency,
+                    ),
+                    const SizedBox(height: 8),
+                    _RecommendationsCard(
+                      sessions: filtered
+                          .where((s) => isTournamentType(s.gameType))
+                          .toList(),
+                      gameLabel: 'tournament',
+                      displayCurrency: displayCurrency,
+                    ),
+                  ] else if (showingCash)
+                    _RecommendationsCard(
+                      sessions: filtered
+                          .where((s) => s.gameType == 'cash')
+                          .toList(),
+                      gameLabel: 'cash',
+                      displayCurrency: displayCurrency,
+                    )
+                  else if (showingTournaments)
+                    _RecommendationsCard(
+                      sessions: filtered
+                          .where((s) => isTournamentType(s.gameType))
+                          .toList(),
+                      gameLabel: 'tournament',
+                      displayCurrency: displayCurrency,
+                    ),
+                ],
+                const SizedBox(height: 20),
+
+                _sectionHeader(context, 'Charts'),
+                const SizedBox(height: 8),
+                _PLChart(
+                    sessions: sorted, displayCurrency: displayCurrency),
+                const SizedBox(height: 20),
+
+                _sectionHeader(context, "What's Affecting Your Win Rate"),
+                Text(
+                  'hrs  ·  $sym/hr  ·  P&L',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                ),
+                const SizedBox(height: 8),
+
+                if (showingCash) ...[
+                  _InsightCard(
+                    title: 'By Stakes',
+                    sessions: filtered
+                        .where((s) => s.gameType == 'cash')
+                        .toList(),
+                    keyFn: (s) => s.stakes,
+                    displayCurrency: displayCurrency,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (showingTournaments) ...[
+                  _InsightCard(
+                    title: 'By Buy-in Level',
+                    sessions: filtered
+                        .where((s) => isTournamentType(s.gameType))
+                        .toList(),
+                    keyFn: (s) => tournamentBuyInBucket(s.buyIn),
+                    orderedKeys: const [
+                      '< \$50',
+                      '\$50–\$100',
+                      '\$100–\$200',
+                      '\$200–\$500',
+                      '> \$500'
+                    ],
+                    displayCurrency: displayCurrency,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (_gameFilter == null &&
+                    showingCash &&
+                    showingTournaments) ...[
+                  _InsightCard(
+                    title: 'By Game Type',
+                    sessions: filtered,
+                    keyFn: (s) => gameTypeLabel(s.gameType),
+                    displayCurrency: displayCurrency,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                _InsightCard(
+                  title: 'By Day of Week',
+                  sessions: filtered,
+                  keyFn: (s) => dayOfWeekLabel(s.date),
+                  orderedKeys: const [
+                    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+                  ],
+                  displayCurrency: displayCurrency,
+                ),
+                const SizedBox(height: 8),
+                _InsightCard(
+                  title: 'By Time of Day',
+                  sessions: filtered,
+                  keyFn: (s) => timeOfDayBucket(s.startTime),
+                  displayCurrency: displayCurrency,
+                ),
+                const SizedBox(height: 8),
+                _InsightCard(
+                  title: 'By Session Length',
+                  sessions: filtered,
+                  keyFn: (s) => sessionLengthBucket(s.durationMinutes),
+                  orderedKeys: const [
+                    '< 2 hours', '2–4 hours', '4–6 hours', '> 6 hours'
+                  ],
+                  displayCurrency: displayCurrency,
+                ),
+                if (showingCash &&
+                    filtered.any((s) =>
+                        s.tableQuality != null &&
+                        s.gameType == 'cash')) ...[
+                  const SizedBox(height: 8),
+                  _InsightCard(
+                    title: 'By Table Quality',
+                    sessions: filtered
+                        .where((s) =>
+                            s.tableQuality != null &&
+                            s.gameType == 'cash')
+                        .toList(),
+                    keyFn: (s) =>
+                        '${s.tableQuality}★ ${tableQualityLabel(s.tableQuality)}',
+                    orderedKeys: List.generate(
+                        5, (i) => '${i + 1}★ ${tableQualityLabel(i + 1)}'),
+                    displayCurrency: displayCurrency,
                   ),
                 ],
-              ),
-            ),
-          ),
-          if (_recsExpanded) ...[
-            const SizedBox(height: 8),
-            if (_gameFilter == null && showingCash && showingTournaments) ...[
-              _RecommendationsCard(
-                sessions: filtered.where((s) => s.gameType == 'cash').toList(),
-                gameTypeLabel: 'cash',
-                displayCurrency: displayCurrency,
-              ),
-              const SizedBox(height: 8),
-              _RecommendationsCard(
-                sessions: filtered
-                    .where((s) => isTournamentType(s.gameType))
-                    .toList(),
-                gameTypeLabel: 'tournament',
-                displayCurrency: displayCurrency,
-              ),
-            ] else if (showingCash)
-              _RecommendationsCard(
-                sessions: filtered.where((s) => s.gameType == 'cash').toList(),
-                gameTypeLabel: 'cash',
-                displayCurrency: displayCurrency,
-              )
-            else if (showingTournaments)
-              _RecommendationsCard(
-                sessions: filtered
-                    .where((s) => isTournamentType(s.gameType))
-                    .toList(),
-                gameTypeLabel: 'tournament',
-                displayCurrency: displayCurrency,
-              ),
-          ],
-          const SizedBox(height: 20),
-
-          _sectionHeader(context, 'Charts'),
-          const SizedBox(height: 8),
-
-          _PLChart(sessions: sorted, displayCurrency: displayCurrency),
-          const SizedBox(height: 20),
-
-          _sectionHeader(context, "What's Affecting Your Win Rate"),
-          Text(
-            'hrs  ·  ${currencySymbol(displayCurrency)}/hr  ·  P&L',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-          ),
-          const SizedBox(height: 8),
-
-          if (showingCash) ...[
-            _InsightCard(
-              title: 'By Stakes',
-              sessions: filtered.where((s) => s.gameType == 'cash').toList(),
-              keyFn: (s) => s.stakes,
-              displayCurrency: displayCurrency,
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (showingTournaments) ...[
-            _InsightCard(
-              title: 'By Buy-in Level',
-              sessions: filtered
-                  .where((s) => isTournamentType(s.gameType))
-                  .toList(),
-              keyFn: (s) => tournamentBuyInBucket(s.buyIn),
-              orderedKeys: const [
-                '< \$50', '\$50–\$100', '\$100–\$200', '\$200–\$500', '> \$500'
+                if (_hasMultipleLocations(filtered)) ...[
+                  const SizedBox(height: 8),
+                  _InsightCard(
+                    title: 'By Location',
+                    sessions: filtered
+                        .where((s) => s.location?.isNotEmpty == true)
+                        .toList(),
+                    keyFn: (s) => s.location!,
+                    displayCurrency: displayCurrency,
+                  ),
+                ],
+                if (hasLiveInView && hasOnlineInView) ...[
+                  const SizedBox(height: 8),
+                  _InsightCard(
+                    title: 'Live vs Online',
+                    sessions: filtered,
+                    keyFn: (s) =>
+                        isOnlineSession(s.location) ? 'Online' : 'Live',
+                    orderedKeys: const ['Live', 'Online'],
+                    displayCurrency: displayCurrency,
+                  ),
+                ],
               ],
-              displayCurrency: displayCurrency,
             ),
-            const SizedBox(height: 8),
-          ],
-          if (_gameFilter == null && _hasCash && _hasTournament) ...[
-            _InsightCard(
-              title: 'By Game Type',
-              sessions: filtered,
-              keyFn: (s) => gameTypeLabel(s.gameType),
-              displayCurrency: displayCurrency,
-            ),
-            const SizedBox(height: 8),
-          ],
-          _InsightCard(
-            title: 'By Day of Week',
-            sessions: filtered,
-            keyFn: (s) => dayOfWeekLabel(s.date),
-            orderedKeys: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            displayCurrency: displayCurrency,
           ),
-          const SizedBox(height: 8),
-          _InsightCard(
-            title: 'By Time of Day',
-            sessions: filtered,
-            keyFn: (s) => timeOfDayBucket(s.startTime),
-            displayCurrency: displayCurrency,
-          ),
-          const SizedBox(height: 8),
-          _InsightCard(
-            title: 'By Session Length',
-            sessions: filtered,
-            keyFn: (s) => sessionLengthBucket(s.durationMinutes),
-            orderedKeys: const [
-              '< 2 hours', '2–4 hours', '4–6 hours', '> 6 hours'
-            ],
-            displayCurrency: displayCurrency,
-          ),
-          if (showingCash &&
-              filtered.any(
-                  (s) => s.tableQuality != null && s.gameType == 'cash')) ...[
-            const SizedBox(height: 8),
-            _InsightCard(
-              title: 'By Table Quality',
-              sessions: filtered
-                  .where(
-                      (s) => s.tableQuality != null && s.gameType == 'cash')
-                  .toList(),
-              keyFn: (s) =>
-                  '${s.tableQuality}★ ${tableQualityLabel(s.tableQuality)}',
-              orderedKeys: List.generate(
-                  5, (i) => '${i + 1}★ ${tableQualityLabel(i + 1)}'),
-              displayCurrency: displayCurrency,
-            ),
-          ],
-          if (_hasMultipleLocations(filtered)) ...[
-            const SizedBox(height: 8),
-            _InsightCard(
-              title: 'By Location',
-              sessions: filtered
-                  .where((s) => s.location?.isNotEmpty == true)
-                  .toList(),
-              keyFn: (s) => s.location!,
-              displayCurrency: displayCurrency,
-            ),
-          ],
-          if (_hasLive && _hasOnline) ...[
-            const SizedBox(height: 8),
-            _InsightCard(
-              title: 'Live vs Online',
-              sessions: filtered,
-              keyFn: (s) => isOnlineSession(s.location) ? 'Online' : 'Live',
-              orderedKeys: const ['Live', 'Online'],
-              displayCurrency: displayCurrency,
-            ),
-          ],
         ],
       ],
     );
@@ -365,120 +467,94 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
       );
 }
 
-// ─── Summary Stats Card ───────────────────────────────────────────────────────
+// ─── Compact Pinned Summary ───────────────────────────────────────────────────
 
-class _StatsCard extends StatelessWidget {
-  final List<SessionModel> sessions;
-  final String displayCurrency;
-  const _StatsCard({required this.sessions, required this.displayCurrency});
+class _SummaryItem {
+  final String label;
+  final String value;
+  final Color? color;
+  const _SummaryItem(this.label, this.value, [this.color]);
+}
+
+class _SummaryDelegate extends SliverPersistentHeaderDelegate {
+  final List<_SummaryItem> items;
+  const _SummaryDelegate({required this.items});
+
+  static const double _rowH = 38.0;
+  static const double _vPad = 6.0;
+  static const double _borderH = 1.0;
+
+  int get _rowCount => (items.length / 3).ceil();
 
   @override
-  Widget build(BuildContext context) {
-    if (sessions.isEmpty) return const SizedBox.shrink();
-    final sym = currencySymbol(displayCurrency);
-    final count = sessions.length;
-    final totalHours =
-        sessions.fold(0, (s, e) => s + e.durationMinutes) / 60.0;
+  double get minExtent => _rowCount * _rowH + _vPad * 2 + _borderH;
 
-    double toD(double amount, String from) =>
-        convertCurrency(amount, from, displayCurrency);
+  @override
+  double get maxExtent => minExtent;
 
-    final totalPL =
-        sessions.fold(0.0, (sum, s) => sum + toD(s.profitLoss, s.currency));
-    final hourlyRate = totalHours > 0 ? totalPL / totalHours : 0.0;
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate old) => true;
 
-    final tSessions =
-        sessions.where((s) => isTournamentType(s.gameType)).toList();
-    final hasTournaments = tSessions.isNotEmpty;
-    final avgROI = hasTournaments
-        ? tSessions.fold(
-                0.0,
-                (sum, s) =>
-                    sum + (s.buyIn > 0 ? s.profitLoss / s.buyIn * 100 : 0.0)) /
-            tSessions.length
-        : null;
-    final itm = hasTournaments
-        ? tSessions.where((s) => (s.prizeWon ?? 0) > 0).length
-        : null;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Summary',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 24,
-              runSpacing: 12,
-              children: [
-                _StatItem(label: 'Sessions', value: '$count'),
-                _StatItem(
-                    label: 'Hours',
-                    value: '${totalHours.toStringAsFixed(1)}h'),
-                _StatItem(
-                  label: 'Win Rate',
-                  value: '$sym${hourlyRate.abs().toStringAsFixed(0)}/hr',
-                  valueColor: hourlyRate >= 0 ? Colors.green : Colors.red,
-                  prefix: hourlyRate >= 0 ? '+' : '-',
-                ),
-                _StatItem(
-                  label: 'Total P&L',
-                  value: formatPLWithCurrency(totalPL, displayCurrency),
-                  valueColor: totalPL >= 0 ? Colors.green : Colors.red,
-                ),
-                if (avgROI != null)
-                  _StatItem(
-                    label: 'Avg ROI',
-                    value: formatROI(avgROI),
-                    valueColor: avgROI >= 0 ? Colors.green : Colors.red,
-                  ),
-                if (itm != null && tSessions.isNotEmpty)
-                  _StatItem(
-                    label: 'ITM',
-                    value:
-                        '${(itm / tSessions.length * 100).toStringAsFixed(0)}%',
-                  ),
-              ],
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final theme = Theme.of(context);
+    final rows = <List<_SummaryItem>>[];
+    for (int i = 0; i < items.length; i += 3) {
+      rows.add(items.sublist(i, math.min(i + 3, items.length)));
+    }
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: overlapsContent ? 2 : 0,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                vertical: _vPad, horizontal: 16),
+            child: Column(
+              children: rows
+                  .map((row) => SizedBox(
+                        height: _rowH,
+                        child: Row(
+                          children: List.generate(
+                            3,
+                            (i) => Expanded(
+                              child: i < row.length
+                                  ? _cell(theme, row[i])
+                                  : const SizedBox(),
+                            ),
+                          ),
+                        ),
+                      ))
+                  .toList(),
             ),
-          ],
-        ),
+          ),
+          Divider(
+            height: _borderH,
+            thickness: _borderH,
+            color: theme.colorScheme.outline.withAlpha(40),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _StatItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? valueColor;
-  final String? prefix;
-  const _StatItem(
-      {required this.label, required this.value, this.valueColor, this.prefix});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                )),
-        const SizedBox(height: 2),
-        Text(value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: valueColor,
-                )),
-      ],
-    );
-  }
+  Widget _cell(ThemeData theme, _SummaryItem item) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(item.label,
+              style: TextStyle(
+                  fontSize: 10, color: theme.colorScheme.outline)),
+          Text(item.value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: item.color,
+              )),
+        ],
+      );
 }
 
 // ─── P&L Chart ────────────────────────────────────────────────────────────────
@@ -501,6 +577,18 @@ class _PLChartState extends State<_PLChart> {
   _Lookback _lookback = _Lookback.all;
   final Set<String> _expandedYears = {DateTime.now().year.toString()};
 
+  static const _modeLabels = {
+    _PLMode.cumulative: 'Cumulative',
+    _PLMode.weekly: 'Weekly',
+    _PLMode.monthly: 'Monthly',
+    _PLMode.yearly: 'Yearly',
+  };
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   double _toD(double amount, String from) =>
       convertCurrency(amount, from, widget.displayCurrency);
 
@@ -515,20 +603,15 @@ class _PLChartState extends State<_PLChart> {
       _Lookback.all => 0,
     };
     final cutoff = now.subtract(Duration(days: days));
-    return widget.sessions
-        .where((s) => DateTime.parse(s.date).isAfter(cutoff))
-        .toList();
+    return widget.sessions.where((s) {
+      final d = DateTime.tryParse(s.date);
+      return d != null && d.isAfter(cutoff);
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final sym = currencySymbol(widget.displayCurrency);
-    const modeLabels = {
-      _PLMode.cumulative: 'Cumulative',
-      _PLMode.weekly: 'Weekly',
-      _PLMode.monthly: 'Monthly',
-      _PLMode.yearly: 'Yearly',
-    };
 
     return Card(
       child: Padding(
@@ -550,7 +633,7 @@ class _PLChartState extends State<_PLChart> {
                     .map((mode) => Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: ChoiceChip(
-                            label: Text(modeLabels[mode]!,
+                            label: Text(_modeLabels[mode]!,
                                 style: const TextStyle(fontSize: 11)),
                             selected: _mode == mode,
                             onSelected: (_) => setState(() => _mode = mode),
@@ -610,10 +693,6 @@ class _PLChartState extends State<_PLChart> {
     final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     final padding = (maxY - minY).abs() * 0.1 + 50;
     final color = cum >= 0 ? Colors.green : Colors.red;
-    const ms = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
     return LineChart(LineChartData(
       lineBarsData: [
         LineChartBarData(
@@ -626,13 +705,14 @@ class _PLChartState extends State<_PLChart> {
         ),
       ],
       lineTouchData: LineTouchData(
-        enabled: true,
+        // fl_chart hover crashes on Windows — disable there, keep on web/Android.
+        enabled: kIsWeb || !Platform.isWindows,
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (_) => Colors.black87,
           getTooltipItems: (spots) => spots.map((spot) {
             final idx = spot.x.toInt().clamp(0, sessions.length - 1);
-            final date = DateTime.parse(sessions[idx].date);
-            final label = '${ms[date.month - 1]} ${date.day}, ${date.year}';
+            final date = DateTime.tryParse(sessions[idx].date) ?? DateTime.now();
+            final label = '${_months[date.month - 1]} ${date.day}, ${date.year}';
             final sign = spot.y >= 0 ? '+' : '-';
             return LineTooltipItem(
               '$label\n$sign$sym${spot.y.abs().toStringAsFixed(0)}',
@@ -735,7 +815,7 @@ class _PLChartState extends State<_PLChart> {
     final byYear =
         <String, Map<String, ({double pl, int count, double hours})>>{};
     for (final s in widget.sessions) {
-      final year = s.date.substring(0, 4);
+      final year = s.date.length >= 4 ? s.date.substring(0, 4) : s.date;
       final key = _periodKey(s.date);
       final pl = _toD(s.profitLoss, s.currency);
       final hours = s.durationMinutes / 60.0;
@@ -916,16 +996,7 @@ class _PLChartState extends State<_PLChart> {
     );
   }
 
-  String _fmtNum(double v) {
-    final sign = v >= 0 ? '+' : '-';
-    final str = v.abs().round().toString();
-    final buf = StringBuffer();
-    for (int i = 0; i < str.length; i++) {
-      if (i > 0 && (str.length - i) % 3 == 0) buf.write(',');
-      buf.write(str[i]);
-    }
-    return '$sign$buf';
-  }
+  String _fmtNum(double v) => formatPL(v, '');
 
   String _periodKey(String dateStr) {
     return switch (_mode) {
@@ -937,28 +1008,25 @@ class _PLChartState extends State<_PLChart> {
   }
 
   String _weekKey(String dateStr) {
-    final date = DateTime.parse(dateStr);
+    final date = DateTime.tryParse(dateStr) ?? DateTime.now();
     final monday = date.subtract(Duration(days: date.weekday - 1));
     return '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
   }
 
   String _periodLabel(String key) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    switch (_mode) {
-      case _PLMode.weekly:
-        final date = DateTime.parse(key);
-        return 'Wk ${months[date.month - 1]} ${date.day}';
-      case _PLMode.monthly:
-        final parts = key.split('-');
-        return "${months[int.parse(parts[1]) - 1]} '${parts[0].substring(2)}";
-      case _PLMode.yearly:
-        return key;
-      default:
-        return key;
+    if (_mode == _PLMode.weekly) {
+      final date = DateTime.tryParse(key) ?? DateTime.now();
+      return 'Wk ${_months[date.month - 1]} ${date.day}';
     }
+    if (_mode == _PLMode.monthly) {
+      final parts = key.split('-');
+      final month = (int.tryParse(parts.length > 1 ? parts[1] : '') ?? 1)
+          .clamp(1, 12);
+      final yearSuffix =
+          parts[0].length >= 4 ? parts[0].substring(2) : parts[0];
+      return "${_months[month - 1]} '$yearSuffix";
+    }
+    return key; // yearly (cumulative never calls _buildTable)
   }
 
   FlTitlesData _leftTitlesOnly(String sym) => FlTitlesData(
@@ -994,14 +1062,12 @@ class _PLChartState extends State<_PLChart> {
 
 class _GroupStats {
   final double totalPL;
-  final double avgPL;
   final int count;
   final double hourlyRate;
   final double totalHours;
 
   _GroupStats({
     required this.totalPL,
-    required this.avgPL,
     required this.count,
     required this.hourlyRate,
     required this.totalHours,
@@ -1012,11 +1078,9 @@ class _GroupStats {
         convertCurrency(amount, from, displayCurrency);
     final total =
         sessions.fold(0.0, (sum, s) => sum + toD(s.profitLoss, s.currency));
-    final totalMinutes = sessions.fold(0, (s, e) => s + e.durationMinutes);
-    final hours = totalMinutes / 60.0;
+    final hours = sessions.fold(0, (s, e) => s + e.durationMinutes) / 60.0;
     return _GroupStats(
       totalPL: total,
-      avgPL: total / sessions.length,
       count: sessions.length,
       hourlyRate: hours > 0 ? total / hours : 0,
       totalHours: hours,
@@ -1050,6 +1114,7 @@ class _InsightCard extends StatelessWidget {
     final stats =
         groups.map((k, v) => MapEntry(k, _GroupStats.from(v, displayCurrency)));
 
+    // Collect all keys that have data, then sort highest→lowest win rate.
     List<String> keys;
     if (orderedKeys != null) {
       keys = orderedKeys!.where((k) => stats.containsKey(k)).toList();
@@ -1057,10 +1122,9 @@ class _InsightCard extends StatelessWidget {
         if (!keys.contains(k)) keys.add(k);
       }
     } else {
-      keys = stats.keys.toList()
-        ..sort((a, b) =>
-            (stats[b]!.hourlyRate).compareTo(stats[a]!.hourlyRate));
+      keys = stats.keys.toList();
     }
+    keys.sort((a, b) => stats[b]!.hourlyRate.compareTo(stats[a]!.hourlyRate));
 
     final maxAbsHourly = stats.values
         .map((s) => s.hourlyRate.abs())
@@ -1149,26 +1213,39 @@ class _InsightRow extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         LayoutBuilder(
-          builder: (_, constraints) => Stack(
-            children: [
-              Container(
-                height: 4,
-                width: constraints.maxWidth,
-                decoration: BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.circular(2),
+          builder: (_, constraints) {
+            final totalWidth = constraints.maxWidth;
+            final halfWidth = totalWidth / 2;
+            final isPositive = stats.hourlyRate >= 0;
+            final barWidth = (halfWidth * barFraction).clamp(0.0, halfWidth);
+            return Stack(
+              children: [
+                // Background track
+                Container(
+                  height: 4,
+                  width: totalWidth,
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              Container(
-                height: 4,
-                width: constraints.maxWidth * barFraction,
-                decoration: BoxDecoration(
-                  color: barColor,
-                  borderRadius: BorderRadius.circular(2),
+                // Positive bar extends right from center; negative extends left
+                Positioned(
+                  left: isPositive ? halfWidth : halfWidth - barWidth,
+                  child: Container(
+                    height: 4,
+                    width: barWidth,
+                    color: barColor,
+                  ),
                 ),
-              ),
-            ],
-          ),
+                // Zero center tick
+                Positioned(
+                  left: halfWidth - 0.5,
+                  child: Container(height: 4, width: 1, color: Colors.white30),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -1205,19 +1282,33 @@ class _RecommendationsCard extends StatelessWidget {
 
   const _RecommendationsCard({
     required this.sessions,
-    required String gameTypeLabel,
+    required String gameLabel,
     required this.displayCurrency,
-  }) : typeLabel = gameTypeLabel;
+  }) : typeLabel = gameLabel;
 
   @override
   Widget build(BuildContext context) {
+    if (sessions.length < 5) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Log at least 5 $typeLabel sessions to get personalised recommendations.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+          ),
+        ),
+      );
+    }
     final recs = _buildRecommendations();
     if (recs.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            'Log at least 5 $typeLabel sessions to get personalised recommendations.',
+            'No strong patterns detected yet in your $typeLabel sessions. '
+            'Results become more reliable as you log more sessions across different days, locations, and stakes.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),
@@ -1294,8 +1385,6 @@ class _RecommendationsCard extends StatelessWidget {
   }
 
   List<_Rec> _buildRecommendations() {
-    if (sessions.length < 5) return [];
-
     final recs = <_Rec>[];
     final overallRates = sessions.map(_sessionRate).toList();
     final overallMean =

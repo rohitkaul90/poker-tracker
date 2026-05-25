@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import '../models/session_model.dart';
 
 int calcDurationMinutes(String startTime, String endTime) {
   final start = _timeToMinutes(startTime);
@@ -89,6 +90,13 @@ String tournamentBuyInBucket(double buyIn) {
 bool isTournamentType(String gameType) =>
     gameType == 'tournament' || gameType == 'sit_and_go';
 
+/// A tournament session is ITM when either:
+/// - prizeWon is explicitly recorded and > 0, OR
+/// - prizeWon was not recorded (e.g. HUD imports) but profitLoss > 0,
+///   meaning the player got back more than they put in.
+bool isSessionItm(double? prizeWon, double profitLoss) =>
+    prizeWon != null ? prizeWon > 0 : profitLoss > 0;
+
 String gameTypeLabel(String gameType) {
   switch (gameType) {
     case 'cash': return 'Cash Game';
@@ -124,18 +132,58 @@ String sessionLengthBucket(int minutes) {
 }
 
 String dayOfWeekLabel(String date) {
-  final dt = DateTime.parse(date);
+  final dt = DateTime.tryParse(date) ?? DateTime.now();
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return days[dt.weekday - 1];
 }
 
 String monthLabel(String date) {
-  final dt = DateTime.parse(date);
+  final dt = DateTime.tryParse(date) ?? DateTime.now();
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   return '${months[dt.month - 1]} ${dt.year}';
+}
+
+// ─── BB/100 ───────────────────────────────────────────────────────────────────
+
+/// Parses the big-blind size from a stakes string like "1/2", "2/5", "$1/$2".
+/// Returns null if the format is unrecognisable.
+double? parseBBFromStakes(String stakes) {
+  final clean = stakes.replaceAll(r'$', '').trim();
+  final parts = clean.split('/');
+  if (parts.length < 2) return null;
+  return double.tryParse(parts[1].trim());
+}
+
+/// BB/100 across the given sessions.
+///
+/// Only includes cash sessions where both [handsPerHour] is set and the BB
+/// can be parsed from [stakes].  Returns null when no qualifying data exists.
+/// The result is dimensionless (profit expressed in BBs), so no currency
+/// conversion is needed.
+double? calcBB100(List<SessionModel> sessions) {
+  double totalProfitBBs = 0;
+  double totalHands = 0;
+  for (final s in sessions) {
+    if (s.gameType != 'cash') continue;
+    final bb = parseBBFromStakes(s.stakes);
+    if (bb == null || bb <= 0) continue;
+    // Use recorded hands/hr if available, otherwise assume 25 (typical live default).
+    final hph = s.handsPerHour ?? 25;
+    final hands = hph * (s.durationMinutes / 60.0);
+    if (hands <= 0) continue;
+    totalProfitBBs += s.profitLoss / bb;
+    totalHands += hands;
+  }
+  if (totalHands <= 0) return null;
+  return totalProfitBBs / totalHands * 100;
+}
+
+String formatBB100(double bb100) {
+  final sign = bb100 >= 0 ? '+' : '';
+  return '$sign${bb100.round()}';
 }
 
 // ─── Currency Conversion ──────────────────────────────────────────────────────

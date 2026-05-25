@@ -582,7 +582,7 @@ class _Stats {
     final totalBuyIn = sessions.fold(
         0.0, (sum, s) => sum + toDisplay(s.buyIn, s.currency));
     final roi = totalBuyIn > 0 ? totalPL / totalBuyIn * 100 : 0.0;
-    final itm = sessions.where((s) => (s.prizeWon ?? 0) > 0).length;
+    final itm = sessions.where((s) => isSessionItm(s.prizeWon, s.profitLoss)).length;
     final itmPct = sessions.isNotEmpty ? itm / sessions.length * 100 : 0.0;
 
     return _Stats(
