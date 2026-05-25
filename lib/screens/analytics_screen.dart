@@ -137,6 +137,9 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth > 800;
+    final hPad = isWide ? math.max(16.0, (screenWidth - 960.0) / 2) : 16.0;
     final filtered = _filtered;
     final sorted = [...filtered]..sort((a, b) => a.date.compareTo(b.date));
     final displayCurrency = _effectiveCurrency;
@@ -210,13 +213,16 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
       if (itmPct != null) _SummaryItem('ITM', '$itmPct%'),
     ];
 
+    final summaryCols =
+        isWide ? (summaryItems.length <= 6 ? summaryItems.length : 4) : 3;
+
     return CustomScrollView(
       slivers: [
         // ── Game-type chip strip (scrolls away) ───────────────────────────
         if (_hasCash && _hasTournament)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 8),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -249,12 +255,19 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
           // ── Compact pinned summary ─────────────────────────────────────
           SliverPersistentHeader(
             pinned: true,
-            delegate: _SummaryDelegate(items: summaryItems),
+            delegate: _SummaryDelegate(
+              items: summaryItems,
+              columns: summaryCols,
+              labelSize: isWide ? 11.5 : 10.0,
+              valueSize: isWide ? 14.0 : 12.0,
+              rowHeight: isWide ? 46.0 : 38.0,
+              hPad: hPad,
+            ),
           ),
 
           // ── Charts and insight cards ───────────────────────────────────
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+            padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 88),
             sliver: SliverList.list(
               children: [
                 // Recommendations (collapsible)
@@ -478,16 +491,28 @@ class _SummaryItem {
 
 class _SummaryDelegate extends SliverPersistentHeaderDelegate {
   final List<_SummaryItem> items;
-  const _SummaryDelegate({required this.items});
+  final int columns;
+  final double labelSize;
+  final double valueSize;
+  final double rowHeight;
+  final double hPad;
 
-  static const double _rowH = 38.0;
   static const double _vPad = 6.0;
   static const double _borderH = 1.0;
 
-  int get _rowCount => (items.length / 3).ceil();
+  const _SummaryDelegate({
+    required this.items,
+    this.columns = 3,
+    this.labelSize = 10.0,
+    this.valueSize = 12.0,
+    this.rowHeight = 38.0,
+    this.hPad = 16.0,
+  });
+
+  int get _rowCount => (items.length / columns).ceil();
 
   @override
-  double get minExtent => _rowCount * _rowH + _vPad * 2 + _borderH;
+  double get minExtent => _rowCount * rowHeight + _vPad * 2 + _borderH;
 
   @override
   double get maxExtent => minExtent;
@@ -500,8 +525,8 @@ class _SummaryDelegate extends SliverPersistentHeaderDelegate {
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     final theme = Theme.of(context);
     final rows = <List<_SummaryItem>>[];
-    for (int i = 0; i < items.length; i += 3) {
-      rows.add(items.sublist(i, math.min(i + 3, items.length)));
+    for (int i = 0; i < items.length; i += columns) {
+      rows.add(items.sublist(i, math.min(i + columns, items.length)));
     }
     return Material(
       color: theme.colorScheme.surface,
@@ -510,15 +535,14 @@ class _SummaryDelegate extends SliverPersistentHeaderDelegate {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(
-                vertical: _vPad, horizontal: 16),
+            padding: EdgeInsets.symmetric(vertical: _vPad, horizontal: hPad),
             child: Column(
               children: rows
                   .map((row) => SizedBox(
-                        height: _rowH,
+                        height: rowHeight,
                         child: Row(
                           children: List.generate(
-                            3,
+                            columns,
                             (i) => Expanded(
                               child: i < row.length
                                   ? _cell(theme, row[i])
@@ -545,11 +569,10 @@ class _SummaryDelegate extends SliverPersistentHeaderDelegate {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(item.label,
-              style: TextStyle(
-                  fontSize: 10, color: theme.colorScheme.outline)),
+              style: TextStyle(fontSize: labelSize, color: theme.colorScheme.outline)),
           Text(item.value,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: valueSize,
                 fontWeight: FontWeight.bold,
                 color: item.color,
               )),
@@ -672,7 +695,10 @@ class _PLChartState extends State<_PLChart> {
                 ),
               ),
               const SizedBox(height: 12),
-              SizedBox(height: 180, child: _buildCumulative(context, sym)),
+              SizedBox(
+                height: MediaQuery.of(context).size.width > 800 ? 240 : 180,
+                child: _buildCumulative(context, sym),
+              ),
             ] else
               _buildTable(context),
           ],
