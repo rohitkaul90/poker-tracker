@@ -366,11 +366,13 @@ class _ImportPreview {
 class ImportMappingScreen extends ConsumerStatefulWidget {
   final List<String> fileHeaders;
   final List<List<dynamic>> rows;
+  final String? initialPresetId;
 
   const ImportMappingScreen({
     super.key,
     required this.fileHeaders,
     required this.rows,
+    this.initialPresetId,
   });
 
   @override
@@ -390,7 +392,8 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedPreset = _autoDetectPreset();
+    // Use preset from source screen if provided; otherwise auto-detect from headers.
+    _selectedPreset = widget.initialPresetId ?? _autoDetectPreset();
     _mapping = _buildMapping(_selectedPreset);
     _preview = _computePreview();
   }
@@ -1053,10 +1056,6 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
       ),
     ];
 
-    final detectedPreset = _selectedPreset != null
-        ? _presets.firstWhere((p) => p.id == _selectedPreset).name
-        : null;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Map Columns')),
       body: Column(
@@ -1078,21 +1077,8 @@ class _ImportMappingScreenState extends ConsumerState<ImportMappingScreen> {
                 const SizedBox(height: 16),
 
                 // ── Source App preset chips ──────────────────────────────────
-                Row(
-                  children: [
-                    Text('Source App',
-                        style: Theme.of(context).textTheme.labelMedium),
-                    if (detectedPreset != null) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '(auto-detected: $detectedPreset)',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                      ),
-                    ],
-                  ],
-                ),
+                Text('Source App',
+                    style: Theme.of(context).textTheme.labelMedium),
                 const SizedBox(height: 8),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
