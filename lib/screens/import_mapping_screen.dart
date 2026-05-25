@@ -215,6 +215,21 @@ const _presets = [
       'notes':          ['notes', 'comments'],
     },
   ),
+  // Special: first CSV line is "—PBT Bankroll Export—" (handled by file parser)
+  _Preset(
+    id: 'poker_bankroll_tracker',
+    name: 'Poker Bankroll Tracker',
+    columns: {
+      'date':             ['date'],
+      'game_type':        ['game', 'game type', 'type'],
+      'stakes':           ['stakes', 'blinds', 'level'],
+      'buy_in':           ['buy-in', 'buyin', 'buy in'],
+      'cash_out':         ['cash-out', 'cashout', 'cash out'],
+      'duration_minutes': ['duration', 'duration (minutes)', 'minutes', 'session length'],
+      'location':         ['venue', 'venue type', 'location', 'casino'],
+      'notes':            ['notes', 'comment'],
+    },
+  ),
 
   // ── Desktop HUD / tracking software ──────────────────────────────────────
   // These export P&L (Net Won), not cash-out — cash-out is derived automatically.

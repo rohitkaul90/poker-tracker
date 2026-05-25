@@ -182,8 +182,14 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
           eol: '\n',
         ).convert(content);
         if (all.isEmpty) throw Exception('File is empty.');
-        headers = all.first.map((e) => e.toString().trim()).toList();
-        rows = all.skip(1).where((r) => r.isNotEmpty).toList();
+        // Poker Bankroll Tracker puts a special identifier on the first line
+        // ("—PBT Bankroll Export—") before the actual column headers.
+        final skipMeta = all.length > 1 &&
+            all[0].length == 1 &&
+            all[0][0].toString().contains('PBT Bankroll Export');
+        final headerRow = skipMeta ? all[1] : all[0];
+        headers = headerRow.map((e) => e.toString().trim()).toList();
+        rows = all.skip(skipMeta ? 2 : 1).where((r) => r.isNotEmpty).toList();
       } else if (ext == 'xlsx' || ext == 'xls') {
         Excel excel;
         try {
@@ -373,7 +379,7 @@ class _ImportExportScreenState extends ConsumerState<ImportExportScreen> {
                   icon: Icons.upload_file_outlined,
                   title: 'Import from CSV or Excel',
                   subtitle:
-                      'Auto-detects: Poker Income, BankrollMob, Simply Poker, Poker Analytics, Poker Journal, PokerBase, Splendid Poker, My Poker Log, Poker Sessions, PokerTracker 4, Hold\'em Manager 3, Hand2Note, DriveHUD, Poker Copilot, Sharkscope, PokerStars History — or any custom CSV / Excel.',
+                      'Auto-detects: Poker Income, BankrollMob, Simply Poker, Poker Analytics, Poker Journal, PokerBase, Splendid Poker, My Poker Log, Poker Sessions, Poker Bankroll Tracker, PokerTracker 4, Hold\'em Manager 3, Hand2Note, DriveHUD, Poker Copilot, Sharkscope, PokerStars History — or any custom CSV / Excel.',
                   onTap: _pickAndImport,
                 ),
                 const SizedBox(height: 24),
