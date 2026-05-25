@@ -6,6 +6,20 @@ class HandService {
   SupabaseClient get _client => Supabase.instance.client;
   String get _uid => _client.auth.currentUser!.id;
 
+  // PGRST303 = "JWT issued at future" — device clock is slightly ahead of the
+  // Supabase server. Refreshing forces a new token timed to the server clock.
+  Future<T> _withRetry<T>(Future<T> Function() fn) async {
+    try {
+      return await fn();
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST303') {
+        await _client.auth.refreshSession();
+        return fn();
+      }
+      rethrow;
+    }
+  }
+
   static String _uuid() {
     final r = Random.secure();
     final b = List<int>.generate(16, (_) => r.nextInt(256));
@@ -16,7 +30,7 @@ class HandService {
         '${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
   }
 
-  Future<List<PokerHand>> fetchHands() async {
+  Future<List<PokerHand>> fetchHands() => _withRetry(() async {
     final rows = await _client
         .from('hands')
         .select()
@@ -32,7 +46,7 @@ class HandService {
       data['playedAt'] = row['played_at'] as String;
       return PokerHand.fromJson(data);
     }).toList();
-  }
+  });
 
   Future<PokerHand> saveHand({
     required TableSetup tableSetup,
@@ -40,7 +54,7 @@ class HandService {
     required List<StreetData> streets,
     String? sessionId,
     String? notes,
-  }) async {
+  }) => _withRetry(() async {
     final id = _uuid();
     final now = DateTime.now();
     final hand = PokerHand(
@@ -61,13 +75,13 @@ class HandService {
       'hand_data': hand.toJson(),
     });
     return hand;
-  }
+  });
 
-  Future<void> deleteHand(String handId) async {
+  Future<void> deleteHand(String handId) => _withRetry(() async {
     await _client
         .from('hands')
         .delete()
         .eq('id', handId)
         .eq('user_id', _uid);
-  }
+  });
 }

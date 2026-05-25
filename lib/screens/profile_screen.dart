@@ -126,145 +126,185 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Avatar
-                Center(
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor:
-                            theme.colorScheme.primary.withAlpha(60),
-                        backgroundImage: avatarUrl != null
-                            ? NetworkImage(avatarUrl)
-                            : null,
-                        child: avatarUrl == null
-                            ? Text(initials,
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.primary,
-                                ))
-                            : null,
-                      ),
-                      if (avatarUrl != null)
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.verified,
-                              size: 16,
-                              color: theme.colorScheme.primary),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    email,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: Colors.white54),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                _SectionHeader('Basic Info'),
-                const SizedBox(height: 8),
-                _field(
-                  controller: _nameCtrl,
-                  label: 'Display Name',
-                  hint: 'How you want to be known',
-                  icon: Icons.badge_outlined,
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  controller: _phoneCtrl,
-                  label: 'Phone Number',
-                  hint: '+1 555 000 0000',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  controller: _cityCtrl,
-                  label: 'Home City',
-                  hint: 'e.g. Las Vegas, Toronto',
-                  icon: Icons.location_city_outlined,
-                ),
-                const SizedBox(height: 24),
-
-                _SectionHeader('Game Preferences'),
-                const SizedBox(height: 8),
-                Row(
+          : Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
                   children: [
-                    for (final entry in [
-                      ('cash', 'Cash'),
-                      ('tournament', 'Tournament'),
-                      ('both', 'Both'),
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(entry.$2),
-                          selected: _preferredGame == entry.$1,
-                          onSelected: (on) => setState(() =>
-                              _preferredGame = on ? entry.$1 : null),
+                    // ── Avatar + email ───────────────────────────────────────
+                    Center(
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 48,
+                            backgroundColor:
+                                theme.colorScheme.primary.withAlpha(60),
+                            backgroundImage: avatarUrl != null
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: avatarUrl == null
+                                ? Text(initials,
+                                    style: TextStyle(
+                                      fontSize: 34,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.primary,
+                                    ))
+                                : null,
+                          ),
+                          if (avatarUrl != null)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.verified,
+                                  size: 16, color: theme.colorScheme.primary),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Text(
+                        email,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: theme.colorScheme.outline),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Basic Info ───────────────────────────────────────────
+                    _SectionHeader('Basic Info'),
+                    const SizedBox(height: 10),
+                    Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            _field(
+                              controller: _nameCtrl,
+                              label: 'Display Name',
+                              hint: 'How you want to be known',
+                              icon: Icons.badge_outlined,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            const SizedBox(height: 14),
+                            _field(
+                              controller: _phoneCtrl,
+                              label: 'Phone Number',
+                              hint: '+1 555 000 0000',
+                              icon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const SizedBox(height: 14),
+                            _field(
+                              controller: _cityCtrl,
+                              label: 'Home City',
+                              hint: 'e.g. Las Vegas, Toronto',
+                              icon: Icons.location_city_outlined,
+                            ),
+                          ],
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Game Preferences ─────────────────────────────────────
+                    _SectionHeader('Game Preferences'),
+                    const SizedBox(height: 10),
+                    Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Preferred Game',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.outline)),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                for (final entry in [
+                                  ('cash', 'Cash'),
+                                  ('tournament', 'Tournament'),
+                                  ('both', 'Both'),
+                                ])
+                                  ChoiceChip(
+                                    label: Text(entry.$2),
+                                    selected: _preferredGame == entry.$1,
+                                    onSelected: (on) => setState(() =>
+                                        _preferredGame = on ? entry.$1 : null),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _field(
+                              controller: _stakesCtrl,
+                              label: 'Preferred Stakes',
+                              hint: 'e.g. 1/2 NL, 2/5 PLO',
+                              icon: Icons.attach_money_outlined,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Goals & Background ───────────────────────────────────
+                    _SectionHeader('Goals & Background'),
+                    const SizedBox(height: 10),
+                    Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            _field(
+                              controller: _sincCtrl,
+                              label: 'Playing Since (year)',
+                              hint: 'e.g. 2018',
+                              icon: Icons.history_outlined,
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 14),
+                            _field(
+                              controller: _rateCtrl,
+                              label: 'Hourly Rate Goal (\$/hr)',
+                              hint: 'e.g. 25',
+                              icon: Icons.trending_up_outlined,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Save button ──────────────────────────────────────────
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.save_outlined),
+                      label: Text(_saving ? 'Saving…' : 'Save Profile'),
+                      style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48)),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                _field(
-                  controller: _stakesCtrl,
-                  label: 'Preferred Stakes',
-                  hint: 'e.g. 1/2 NL, 2/5 PLO',
-                  icon: Icons.attach_money_outlined,
-                ),
-                const SizedBox(height: 24),
-
-                _SectionHeader('Goals & Background'),
-                const SizedBox(height: 8),
-                _field(
-                  controller: _sincCtrl,
-                  label: 'Playing Since (year)',
-                  hint: 'e.g. 2018',
-                  icon: Icons.history_outlined,
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  controller: _rateCtrl,
-                  label: 'Hourly Rate Goal (\$/hr)',
-                  hint: 'e.g. 25',
-                  icon: Icons.trending_up_outlined,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-                const SizedBox(height: 32),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _saving ? null : _save,
-                    icon: _saving
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.save_outlined),
-                    label: Text(_saving ? 'Saving…' : 'Save Profile'),
-                    style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14)),
-                  ),
-                ),
-              ],
+              ),
             ),
     );
   }
@@ -302,7 +342,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Text(
         text.toUpperCase(),
         style: TextStyle(
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
           color: Theme.of(context).colorScheme.primary,

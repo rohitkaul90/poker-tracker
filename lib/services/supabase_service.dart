@@ -6,6 +6,18 @@ class SupabaseService {
 
   String? get _uid => _client.auth.currentUser?.id;
 
+  Future<T> _withRetry<T>(Future<T> Function() fn) async {
+    try {
+      return await fn();
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST303') {
+        await _client.auth.refreshSession();
+        return fn();
+      }
+      rethrow;
+    }
+  }
+
   Stream<List<SessionModel>> watchAllSessions() {
     final uid = _uid;
     if (uid == null) return const Stream.empty();
@@ -24,62 +36,65 @@ class SupabaseService {
         });
   }
 
-  Future<void> insertSession(Map<String, dynamic> data) async {
+  Future<void> insertSession(Map<String, dynamic> data) {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    await _client.from('sessions').insert({...data, 'user_id': uid});
+    return _withRetry(() => _client.from('sessions').insert({...data, 'user_id': uid}));
   }
 
-  Future<void> bulkInsertSessions(List<Map<String, dynamic>> sessions) async {
+  Future<void> bulkInsertSessions(List<Map<String, dynamic>> sessions) {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    if (sessions.isEmpty) return;
+    if (sessions.isEmpty) return Future.value();
     final withUser = sessions.map((s) => {...s, 'user_id': uid}).toList();
-    await _client.from('sessions').insert(withUser);
+    return _withRetry(() => _client.from('sessions').insert(withUser));
   }
 
-  Future<void> updateSession(String id, Map<String, dynamic> data) async {
+  Future<void> updateSession(String id, Map<String, dynamic> data) {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    await _client.from('sessions').update(data).eq('id', id).eq('user_id', uid);
+    return _withRetry(() =>
+        _client.from('sessions').update(data).eq('id', id).eq('user_id', uid));
   }
 
-  Future<void> deleteSession(String id) async {
+  Future<void> deleteSession(String id) {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    await _client.from('sessions').delete().eq('id', id).eq('user_id', uid);
+    return _withRetry(() =>
+        _client.from('sessions').delete().eq('id', id).eq('user_id', uid));
   }
 
-  Future<void> clearAllSessions() async {
+  Future<void> clearAllSessions() {
     final uid = _uid;
     if (uid == null) throw Exception('Not authenticated');
-    await _client.from('sessions').delete().eq('user_id', uid);
+    return _withRetry(() =>
+        _client.from('sessions').delete().eq('user_id', uid));
   }
 
   Future<Map<String, dynamic>?> getRakePreset(
-      String location, String gameType, String stakes) async {
+      String location, String gameType, String stakes) {
     final uid = _uid;
-    if (uid == null) return null;
-    return await _client
+    if (uid == null) return Future.value(null);
+    return _withRetry(() => _client
         .from('rake_presets')
         .select()
         .eq('user_id', uid)
         .eq('location', location)
         .eq('game_type', gameType)
         .eq('stakes', stakes)
-        .maybeSingle();
+        .maybeSingle());
   }
 
   Future<void> upsertRakePreset(
-      String location, String gameType, String stakes, double amount) async {
+      String location, String gameType, String stakes, double amount) {
     final uid = _uid;
-    if (uid == null) return;
-    await _client.from('rake_presets').upsert({
+    if (uid == null) return Future.value();
+    return _withRetry(() => _client.from('rake_presets').upsert({
       'user_id': uid,
       'location': location,
       'game_type': gameType,
       'stakes': stakes,
       'rake_amount': amount,
-    }, onConflict: 'user_id,location,game_type,stakes');
+    }, onConflict: 'user_id,location,game_type,stakes'));
   }
 }

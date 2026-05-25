@@ -20,12 +20,14 @@ class PlayingCard extends StatelessWidget {
       case 'd': return '♦';
       case 'c': return '♣';
       case 's': return '♠';
-      default: return '';
+      default:  return '';
     }
   }
 
   Color get _suitColor =>
-      (_suit == 'h' || _suit == 'd') ? const Color(0xFFD32F2F) : const Color(0xFF1A1A1A);
+      (_suit == 'h' || _suit == 'd')
+          ? const Color(0xFFD32F2F)
+          : const Color(0xFF1A1A1A);
 
   String get _displayRank => _rank == 'T' ? '10' : _rank;
 
@@ -57,6 +59,9 @@ class PlayingCard extends StatelessWidget {
         ),
       );
 
+  // Two-corner design — no large center suit symbol.
+  // Removing the center element eliminates the three-symbol overlap that
+  // causes blotting on high-DPR Android displays.
   Widget _faceUp() => Container(
         width: width,
         height: height,
@@ -72,47 +77,41 @@ class PlayingCard extends StatelessWidget {
           ],
         ),
         child: Stack(children: [
-          Positioned(
-            top: 1,
-            left: 2,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(_displayRank,
-                  style: TextStyle(
-                      fontSize: width * 0.27,
-                      fontWeight: FontWeight.bold,
-                      color: _suitColor,
-                      height: 1.1)),
-              Text(_suitSymbol,
-                  style: TextStyle(
-                      fontSize: width * 0.22,
-                      color: _suitColor,
-                      height: 1.0)),
-            ]),
-          ),
-          Center(
-            child: Text(_suitSymbol,
-                style: TextStyle(fontSize: width * 0.48, color: _suitColor)),
-          ),
+          Positioned(top: 1, left: 2, child: _cornerLabel()),
           Positioned(
             bottom: 1,
             right: 2,
             child: Transform.rotate(
               angle: 3.14159,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(_displayRank,
-                    style: TextStyle(
-                        fontSize: width * 0.27,
-                        fontWeight: FontWeight.bold,
-                        color: _suitColor,
-                        height: 1.1)),
-                Text(_suitSymbol,
-                    style: TextStyle(
-                        fontSize: width * 0.22,
-                        color: _suitColor,
-                        height: 1.0)),
-              ]),
+              child: _cornerLabel(),
             ),
           ),
         ]),
       );
+
+  Widget _cornerLabel() {
+    final rankSize = (width * 0.32).clamp(5.0, 22.0);
+    final suitSize = (width * 0.26).clamp(4.0, 18.0);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          _displayRank,
+          style: TextStyle(
+              fontSize: rankSize,
+              fontWeight: FontWeight.bold,
+              color: _suitColor,
+              height: 1.1),
+        ),
+        Text(
+          _suitSymbol,
+          style: TextStyle(
+              fontSize: suitSize,
+              color: _suitColor,
+              height: 1.0),
+        ),
+      ],
+    );
+  }
 }

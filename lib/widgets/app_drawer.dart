@@ -150,27 +150,6 @@ class AppDrawer extends ConsumerWidget {
               },
             ),
 
-            // ── Settings section ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-              child: Text(
-                'SETTINGS',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.lock_reset_outlined),
-              title: const Text('Reset Password'),
-              subtitle: const Text('Send reset link to your email',
-                  style: TextStyle(fontSize: 11)),
-              onTap: () => _sendPasswordReset(context, email),
-            ),
-
             const Spacer(),
             const Divider(height: 1),
 
@@ -189,25 +168,6 @@ class AppDrawer extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _sendPasswordReset(BuildContext context, String email) async {
-    Navigator.pop(context);
-    if (email.isEmpty) return;
-    try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reset link sent to $email')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
   }
 
   Future<void> _confirmSignOut(BuildContext context) async {
