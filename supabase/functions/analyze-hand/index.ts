@@ -213,7 +213,7 @@ ACCURACY RULES:
 1. CARD ACCURACY: Reproduce hole cards and board cards exactly as given. Never alter rank or suit.
 2. BET-COUNTING: BB post is not a raise. Open-raise = 2-bet, re-raise = 3-bet, re-raise over 3-bet = 4-bet, jam or raise over 4-bet = 5-bet. Never miscategorise.
 3. TEXT FORMATTING: Plain prose only. No escape characters (\\n, \\t), no markdown, no bullet symbols inside string fields.
-4. HAND READING — before coaching any street, work through these steps:
+4. HAND READING — silently work through these steps before writing any output field. Never include this reasoning in your output — only state the conclusions:
 
    STEP 1 — LIST CARDS: State hero's two hole cards and the current board cards with their exact ranks and suits as given. Never alter or infer any rank or suit.
 

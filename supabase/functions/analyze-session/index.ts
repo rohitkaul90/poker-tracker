@@ -360,7 +360,7 @@ ACCURACY RULES — follow these precisely:
 
 4. TEXT FORMATTING: Write all string field values as plain prose only. Do not embed newline characters (\n), tab characters (\t), bullet symbols, markdown, or any other special characters inside string fields. Paragraphs in the narrative field must be separated by a double newline only.
 
-5. HAND READING — before coaching any street, work through these steps:
+5. HAND READING — silently work through these steps before writing any output field. Never include this reasoning in your output — only state the conclusions:
 
    STEP 1 — LIST CARDS: State hero's two hole cards and the current board cards with their exact ranks and suits as given. Never alter or infer any rank or suit.
 
