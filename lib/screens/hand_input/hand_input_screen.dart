@@ -20,7 +20,16 @@ enum _Step {
 }
 
 class HandInputScreen extends ConsumerStatefulWidget {
-  const HandInputScreen({super.key});
+  final String? prefilledSessionId;
+  final String? prefilledStakes;
+  final String? prefilledSessionLabel;
+
+  const HandInputScreen({
+    super.key,
+    this.prefilledSessionId,
+    this.prefilledStakes,
+    this.prefilledSessionLabel,
+  });
 
   @override
   ConsumerState<HandInputScreen> createState() => _HandInputScreenState();
@@ -82,6 +91,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
   final Set<int> _allInSeats = {};
   Street _currentStreet = Street.preflop;
   int _pot = 0;
+  int _lastRaiseSize = 0;
   final List<StreetData> _completedStreets = [];
 
   // ── community cards ──────────────────────────────────────────────────────────
@@ -97,6 +107,63 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
   final Map<int, List<String>?> _showdownCards = {};
   int _showdownIdx = 0;
   late List<int> _showdownOrder;
+
+  // ── undo stack ───────────────────────────────────────────────────────────────
+  final List<_HandSnapshot> _undoStack = [];
+
+  void _pushSnapshot() {
+    _undoStack.add(_HandSnapshot(
+      streetActions: List.from(_streetActions),
+      completedStreets: List.from(_completedStreets),
+      toAct: List.from(_toAct),
+      activeSeats: List.from(_activeSeats),
+      runningStacks: Map.from(_runningStacks),
+      contributions: Map.from(_contributions),
+      currentBet: _currentBet,
+      currentStreet: _currentStreet,
+      pot: _pot,
+      lastRaiseSize: _lastRaiseSize,
+      allInSeats: Set.from(_allInSeats),
+      step: _step,
+      awaitingDeal: _awaitingDeal,
+      flopCards: List.from(_flopCards),
+      turnCard: _turnCard,
+      riverCard: _riverCard,
+    ));
+  }
+
+  void _undo() {
+    if (_undoStack.isEmpty) return;
+    final snap = _undoStack.removeLast();
+    setState(() {
+      _streetActions
+        ..clear()
+        ..addAll(snap.streetActions);
+      _completedStreets
+        ..clear()
+        ..addAll(snap.completedStreets);
+      _toAct = snap.toAct;
+      _activeSeats = snap.activeSeats;
+      _runningStacks = snap.runningStacks;
+      _contributions = snap.contributions;
+      _currentBet = snap.currentBet;
+      _currentStreet = snap.currentStreet;
+      _pot = snap.pot;
+      _lastRaiseSize = snap.lastRaiseSize;
+      _allInSeats
+        ..clear()
+        ..addAll(snap.allInSeats);
+      _step = snap.step;
+      _awaitingDeal = snap.awaitingDeal;
+      _flopCards = snap.flopCards;
+      _turnCard = snap.turnCard;
+      _riverCard = snap.riverCard;
+      _raiseMode = false;
+    });
+  }
+
+  // ── session linking ──────────────────────────────────────────────────────────
+  String? _selectedSessionId;
 
   // ── saved hand ───────────────────────────────────────────────────────────────
   PokerHand? _savedHand;
@@ -133,10 +200,19 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
   int get _currentPot =>
       _pot + _contributions.values.fold(0, (a, b) => a + b);
 
-  int get _minRaise {
-    final prev = _contributions[_toAct.isNotEmpty ? _toAct.first : -1] ?? 0;
-    final needed = _currentBet - prev;
-    return _currentBet + max(_setup.bigBlind, needed);
+  int get _minRaise =>
+      _currentBet + max(_setup.bigBlind, _lastRaiseSize);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.prefilledSessionId != null) {
+      _selectedSessionId = widget.prefilledSessionId;
+    }
+    if (widget.prefilledStakes != null &&
+        _presetStakes.contains(widget.prefilledStakes)) {
+      _selectedStakes = widget.prefilledStakes!;
+    }
   }
 
   // ── setup → start ────────────────────────────────────────────────────────────
@@ -169,6 +245,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
 
     _activeSeats = List.generate(_numSeats, (i) => i);
     _runningStacks = {for (final p in _players) p.seatIndex: p.startingStack};
+    _undoStack.clear();
 
     _initPreflop();
   }
@@ -181,6 +258,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     _allInSeats.clear();
     _raiseMode = false;
     _currentBet = _setup.straddle ?? _setup.bigBlind;
+    _lastRaiseSize = _setup.straddle ?? _setup.bigBlind;
 
     void post(int seat, int amount, ActionType type) {
       _contributions[seat] = amount;
@@ -206,12 +284,14 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     _raiseMode = false;
     _awaitingDeal = false;
     _currentBet = 0;
+    _lastRaiseSize = 0;
     _toAct = _setup.postflopOrder(_activeSeats);
     setState(() => _step = nextStep);
   }
 
   // ── action handlers ───────────────────────────────────────────────────────────
   void _doFold() {
+    _pushSnapshot();
     final seat = _toAct.removeAt(0);
     _activeSeats.remove(seat);
     _streetActions.add(HandAction(seat: seat, type: ActionType.fold));
@@ -219,12 +299,14 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
   }
 
   void _doCheck() {
+    _pushSnapshot();
     final seat = _toAct.removeAt(0);
     _streetActions.add(HandAction(seat: seat, type: ActionType.check));
     _checkStreetDone();
   }
 
   void _doCall() {
+    _pushSnapshot();
     final seat = _toAct.removeAt(0);
     final prev = _contributions[seat] ?? 0;
     final stack = _runningStacks[seat] ?? 0;
@@ -243,6 +325,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
   }
 
   void _doRaise(int totalAmount) {
+    _pushSnapshot();
     final isOpeningBet = _currentBet == 0;
     final seat = _toAct.removeAt(0);
     final prev = _contributions[seat] ?? 0;
@@ -252,7 +335,11 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     final actual = isAllIn ? stack : delta;
     _contributions[seat] = prev + actual;
     _runningStacks[seat] = stack - actual;
+
+    final prevBet = _currentBet;
     _currentBet = _contributions[seat]!;
+    _lastRaiseSize = _currentBet - prevBet;
+
     if (isAllIn) _allInSeats.add(seat);
     _streetActions.add(HandAction(
         seat: seat,
@@ -261,12 +348,13 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
         isAllIn: isAllIn,
         isOpeningBet: isOpeningBet));
 
-    final order = _currentStreet == Street.preflop
-        ? _setup.preflopOrder(_activeSeats)
-        : _setup.postflopOrder(_activeSeats);
-    _toAct = order
-        .where((s) => s != seat && !_allInSeats.contains(s))
+    // Action goes clockwise from the player immediately left of the raiser.
+    // This is correct for both preflop and postflop — do NOT restart from UTG.
+    final nextSeat = (seat + 1) % _setup.numSeats;
+    _toAct = List.generate(_setup.numSeats, (i) => (nextSeat + i) % _setup.numSeats)
+        .where((s) => _activeSeats.contains(s) && s != seat && !_allInSeats.contains(s))
         .toList();
+
     _raiseMode = false;
     _checkStreetDone();
   }
@@ -295,6 +383,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
       actions: List.from(_streetActions),
     ));
     _pot += _contributions.values.fold(0, (a, b) => a + b);
+    _contributions = {};
 
     if (_activeSeats.length <= 1 || _currentStreet == Street.river) {
       _beginShowdown();
@@ -315,6 +404,8 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
 
     final picked = await _pickCards(count);
     if (!mounted || picked == null || picked.length != count) return;
+
+    _pushSnapshot();
 
     if (nextStreet == Street.flop) {
       _flopCards = picked;
@@ -374,6 +465,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
       tableSetup: _setup,
       players: updatedPlayers,
       streets: _completedStreets,
+      sessionId: _selectedSessionId,
     );
     setState(() {
       _savedHand = hand;
@@ -413,6 +505,17 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => _confirmExit(context),
         ),
+        actions: [
+          if (_undoStack.isNotEmpty &&
+              _step != _Step.setup &&
+              _step != _Step.done &&
+              _step != _Step.showdown)
+            IconButton(
+              icon: const Icon(Icons.undo_rounded),
+              tooltip: 'Undo last action',
+              onPressed: _undo,
+            ),
+        ],
       ),
       body: SafeArea(child: _buildBody()),
     );
@@ -461,6 +564,16 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Session linking ──────────────────────────────────────────────────
+        if (widget.prefilledSessionId != null)
+          _LinkedSessionBanner(label: widget.prefilledSessionLabel)
+        else
+          _SessionPickerTile(
+            selectedSessionId: _selectedSessionId,
+            onChanged: (id) => setState(() => _selectedSessionId = id),
+          ),
+        const SizedBox(height: 20),
+
         const Text('Table Size',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
@@ -994,13 +1107,15 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
                     label:
                         Text(lbl, style: const TextStyle(fontSize: 11)),
                     onPressed: () {
-                      final pot = _currentPot;
+                      // Pot size = pot after the raiser calls, then raises by that amount.
+                      final callAmt = _currentBet - prev;
+                      final potAfterCall = _currentPot + callAmt;
                       final amt = switch (lbl) {
-                        '1/3 pot' => _currentBet + (pot / 3).round(),
-                        '½ pot' => _currentBet + (pot / 2).round(),
-                        '2/3 pot' => _currentBet + (pot * 2 ~/ 3),
-                        'Pot' => _currentBet + pot,
-                        _ => stack + prev,
+                        '1/3 pot' => _currentBet + (potAfterCall / 3).round(),
+                        '½ pot'   => _currentBet + (potAfterCall / 2).round(),
+                        '2/3 pot' => _currentBet + (potAfterCall * 2 ~/ 3),
+                        'Pot'     => _currentBet + potAfterCall,
+                        _         => stack + prev,
                       };
                       _raiseCtrl.text =
                           amt.clamp(_minRaise, stack + prev).toString();
@@ -1247,6 +1362,159 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     for (final f in _nameFocusNodes) f.dispose();
     for (final c in _stackCtrl) c.dispose();
     super.dispose();
+  }
+}
+
+// ── undo snapshot ─────────────────────────────────────────────────────────────
+
+class _HandSnapshot {
+  final List<HandAction> streetActions;
+  final List<StreetData> completedStreets;
+  final List<int> toAct;
+  final List<int> activeSeats;
+  final Map<int, int> runningStacks;
+  final Map<int, int> contributions;
+  final int currentBet;
+  final Street currentStreet;
+  final int pot;
+  final int lastRaiseSize;
+  final Set<int> allInSeats;
+  final _Step step;
+  final bool awaitingDeal;
+  final List<String> flopCards;
+  final String? turnCard;
+  final String? riverCard;
+
+  const _HandSnapshot({
+    required this.streetActions,
+    required this.completedStreets,
+    required this.toAct,
+    required this.activeSeats,
+    required this.runningStacks,
+    required this.contributions,
+    required this.currentBet,
+    required this.currentStreet,
+    required this.pot,
+    required this.lastRaiseSize,
+    required this.allInSeats,
+    required this.step,
+    required this.awaitingDeal,
+    required this.flopCards,
+    required this.turnCard,
+    required this.riverCard,
+  });
+}
+
+// ── session linking widgets ────────────────────────────────────────────────────
+
+class _LinkedSessionBanner extends StatelessWidget {
+  final String? label;
+  const _LinkedSessionBanner({this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.link_rounded,
+              size: 16, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label != null ? 'Linked to: $label' : 'Linked to session',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionPickerTile extends ConsumerWidget {
+  final String? selectedSessionId;
+  final ValueChanged<String?> onChanged;
+
+  const _SessionPickerTile({
+    required this.selectedSessionId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(sessionsProvider);
+
+    return sessionsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (sessions) {
+        if (sessions.isEmpty) return const SizedBox.shrink();
+
+        final sorted = [...sessions]
+          ..sort((a, b) => b.date.compareTo(a.date));
+        final recent = sorted.take(20).toList();
+
+        final selected =
+            selectedSessionId != null
+                ? recent.where((s) => s.id == selectedSessionId).firstOrNull
+                : null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Link to Session (optional)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String?>(
+              value: selectedSessionId,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+              hint: const Text('None'),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('None'),
+                ),
+                ...recent.map((s) {
+                  final date = s.date.length >= 10 ? s.date.substring(0, 10) : s.date;
+                  final label = '$date  ·  ${s.gameType}  ·  ${s.stakes}';
+                  return DropdownMenuItem<String?>(
+                    value: s.id,
+                    child: Text(label,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13)),
+                  );
+                }),
+              ],
+              onChanged: onChanged,
+            ),
+            if (selected != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Text(
+                  'Session: ${selected.date.substring(0, 10)}  ·  ${selected.stakes}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
 

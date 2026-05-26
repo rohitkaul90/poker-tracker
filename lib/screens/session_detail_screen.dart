@@ -5,6 +5,8 @@ import '../models/session_model.dart';
 import '../providers/providers.dart';
 import '../utils/helpers.dart';
 import 'log_session_screen.dart';
+import 'ai_analysis/session_analysis_screen.dart';
+import 'hand_input/hand_input_screen.dart';
 
 class SessionDetailScreen extends ConsumerWidget {
   final SessionModel session;
@@ -172,6 +174,39 @@ class SessionDetailScreen extends ConsumerWidget {
             _Row(label: 'Notes', value: session.notes!),
 
           const SizedBox(height: 32),
+          FilledButton.icon(
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('AI Analysis'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SessionAnalysisScreen(session: session),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.style_outlined),
+            label: const Text('Record a Hand'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HandInputScreen(
+                  prefilledSessionId: session.id,
+                  prefilledStakes: session.stakes,
+                  prefilledSessionLabel:
+                      '${DateFormat('MMM d').format(DateTime.parse(session.date))}  ·  ${session.stakes}',
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             icon: const Icon(Icons.delete_outline, color: Colors.red),
             label: const Text('Delete Session',

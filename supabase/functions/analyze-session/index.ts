@@ -1,0 +1,472 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import Anthropic from "npm:@anthropic-ai/sdk@0.24.3";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+// ── Types mirroring the Flutter models ──────────────────────────────────────
+
+interface Session {
+  id: string;
+  date: string;
+  stakes: string;
+  gameType: string;
+  buyIn: number;
+  cashOut: number;
+  profitLoss: number;
+  durationMinutes: number;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+  country?: string;
+  notes?: string;
+  rakePaid?: number;
+  tableQuality?: number;
+  handsPerHour?: number;
+  finishPosition?: number;
+  totalEntrants?: number;
+  prizeWon?: number;
+  currency: string;
+}
+
+interface HandAction {
+  seat: number;
+  type: string;
+  amount?: number;
+  allIn?: boolean;
+  openingBet?: boolean;
+}
+
+interface StreetData {
+  street: string;
+  communityCards: string[];
+  actions: HandAction[];
+}
+
+interface HandPlayer {
+  seat: number;
+  name: string;
+  stack: number;
+  isHero: boolean;
+  holeCards?: string[];
+}
+
+interface TableSetup {
+  numSeats: number;
+  buttonSeat: number;
+  heroSeat: number;
+  smallBlind: number;
+  bigBlind: number;
+  straddle?: number;
+}
+
+interface PokerHand {
+  id: string;
+  tableSetup: TableSetup;
+  players: HandPlayer[];
+  streets: StreetData[];
+  notes?: string;
+}
+
+interface PlayerRead {
+  playerLabel: string;
+  tags: string[];
+  notes?: string;
+}
+
+// ── Tool definition — forces Claude to always return valid structured JSON ───
+
+const streetFeedbackSchema = {
+  anyOf: [
+    { type: "null" },
+    {
+      type: "object",
+      properties: {
+        decision: { type: "string", description: "What hero actually did on this street" },
+        optimal: { type: "string", description: "The better or optimal play" },
+        rationale: { type: "string", description: "Why that play is better" },
+        wasGto: { type: "boolean", description: "True if hero's play was GTO-aligned" },
+      },
+      required: ["decision", "optimal", "rationale", "wasGto"],
+    },
+  ],
+};
+
+// deno-lint-ignore no-explicit-any
+const ANALYSIS_TOOL: any = {
+  name: "provide_analysis",
+  description: "Return structured poker coaching feedback for the session",
+  input_schema: {
+    type: "object",
+    properties: {
+      narrative: {
+        type: "string",
+        description:
+          "3-4 paragraph coaching narrative. Address the player directly as 'you'. Be specific — reference actual results, patterns, and reads. Separate variance from skill. Keep tone constructive.",
+      },
+      keyThemes: {
+        type: "array",
+        items: { type: "string" },
+        description: "2-4 short theme labels capturing the session's main patterns, e.g. 'Thin value betting', 'Preflop 3-bet frequency'",
+      },
+      leaksIdentified: {
+        type: "array",
+        items: { type: "string" },
+        description: "Specific actionable leaks. Each entry is 1-2 sentences.",
+      },
+      actionableTip: {
+        type: "string",
+        description: "One concrete focus point for the next session",
+      },
+      handAnalyses: {
+        type: "array",
+        description:
+          "Street-by-street coaching for each recorded hand. Empty array if no hands were recorded. Use null for streets not reached.",
+        items: {
+          type: "object",
+          properties: {
+            handIndex: { type: "integer" },
+            summary: {
+              type: "string",
+              description: "Brief hand label, e.g. 'AKo 3-bet pot, BTN vs CO open'",
+            },
+            verdict: {
+              type: "string",
+              enum: ["highEV", "neutral", "leakDetected"],
+            },
+            preflop: streetFeedbackSchema,
+            flop: streetFeedbackSchema,
+            turn: streetFeedbackSchema,
+            river: streetFeedbackSchema,
+          },
+          required: [
+            "handIndex",
+            "summary",
+            "verdict",
+            "preflop",
+            "flop",
+            "turn",
+            "river",
+          ],
+        },
+      },
+    },
+    required: [
+      "narrative",
+      "keyThemes",
+      "leaksIdentified",
+      "actionableTip",
+      "handAnalyses",
+    ],
+  },
+};
+
+// ── Prompt helpers ───────────────────────────────────────────────────────────
+
+function positionName(seat: number, setup: TableSetup): string {
+  const off = (seat - setup.buttonSeat + setup.numSeats) % setup.numSeats;
+  if (setup.straddle != null && off === 3) return "STR";
+  if (setup.numSeats <= 6) {
+    const n = ["BTN", "SB", "BB", "UTG", "HJ", "CO"];
+    return off < n.length ? n[off] : `P${seat + 1}`;
+  }
+  const n = ["BTN", "SB", "BB", "UTG", "UTG+1", "UTG+2", "MP", "HJ", "CO"];
+  return off < n.length ? n[off] : `P${seat + 1}`;
+}
+
+function formatAction(a: HandAction, playerName: string, pos: string): string {
+  const who = `${playerName}(${pos})`;
+  switch (a.type) {
+    case "fold": return `${who} folds`;
+    case "check": return `${who} checks`;
+    case "call": return `${who} calls ${a.amount ?? 0}`;
+    case "raise": return a.openingBet
+      ? `${who} bets ${a.amount ?? 0}`
+      : `${who} raises to ${a.amount ?? 0}${a.allIn ? " (all-in)" : ""}`;
+    case "allIn": return `${who} goes all-in ${a.amount ?? 0}`;
+    case "post": return `${who} posts ${a.amount ?? 0}`;
+    case "postStraddle": return `${who} straddles ${a.amount ?? 0}`;
+    default: return `${who} ${a.type}`;
+  }
+}
+
+function formatHand(hand: PokerHand, reads: PlayerRead[], idx: number): string {
+  const { tableSetup: ts, players, streets } = hand;
+  const seatMap = new Map<number, HandPlayer>(players.map((p) => [p.seat, p]));
+  const readMap = new Map<string, PlayerRead>(
+    reads.map((r) => [r.playerLabel.toLowerCase(), r]),
+  );
+
+  const hero = players.find((p) => p.isHero);
+  const heroPos = hero ? positionName(hero.seat, ts) : "?";
+  const heroCards = hero?.holeCards?.join(" ") ?? "??";
+  const board = streets.flatMap((s) => s.communityCards);
+
+  const lines: string[] = [
+    `Hand ${idx + 1}: Hero [${heroCards}] in ${heroPos} | ${ts.numSeats}-handed | ${ts.smallBlind}/${ts.bigBlind}BB`,
+  ];
+
+  const opponents = players.filter((p) => !p.isHero);
+  const readLines = opponents.map((p) => {
+    const r = readMap.get(p.name.toLowerCase());
+    const pos = positionName(p.seat, ts);
+    if (r) {
+      const tagStr = r.tags.length ? ` [${r.tags.join(", ")}]` : "";
+      const noteStr = r.notes ? ` — "${r.notes}"` : "";
+      return `  ${p.name}(${pos})${tagStr}${noteStr}`;
+    }
+    return `  ${p.name}(${pos}) — no read (use GTO defaults)`;
+  });
+  if (readLines.length) lines.push("Opponents:", ...readLines);
+
+  if (board.length) lines.push(`Board: ${board.join(" ")}`);
+
+  for (const street of streets) {
+    const label = street.street.toUpperCase();
+    const cc = street.communityCards.length
+      ? ` [${street.communityCards.join(" ")}]`
+      : "";
+    const actionStr = street.actions
+      .map((a) => {
+        const p = seatMap.get(a.seat);
+        if (!p) return "";
+        return formatAction(
+          a,
+          p.isHero ? "Hero" : p.name,
+          positionName(a.seat, ts),
+        );
+      })
+      .filter(Boolean)
+      .join("; ");
+    lines.push(`${label}${cc}: ${actionStr}`);
+  }
+
+  if (hand.notes) lines.push(`Note: "${hand.notes}"`);
+  return lines.join("\n");
+}
+
+function buildUserPrompt(
+  session: Session,
+  hands: PokerHand[],
+  reads: PlayerRead[],
+): string {
+  const isTournament = session.gameType.toLowerCase().includes("tournament");
+  const sym = session.currency === "USD" ? "$"
+    : session.currency === "GBP" ? "£"
+    : session.currency === "EUR" ? "€"
+    : "CA$";
+  const sign = session.profitLoss >= 0 ? "+" : "";
+  const hours = session.durationMinutes
+    ? ` (${(session.durationMinutes / 60).toFixed(1)}h)`
+    : "";
+
+  // Only include reads for players who appear by name in recorded hands
+  // or are explicitly mentioned in the session notes — never assume all
+  // players in the reads database were present at this session.
+  const handOpponentNames = new Set(
+    hands.flatMap((h) =>
+      h.players.filter((p) => !p.isHero).map((p) => p.name.toLowerCase())
+    ),
+  );
+  const notesLower = (session.notes ?? "").toLowerCase();
+  const relevantReads = reads.filter((r) => {
+    const label = r.playerLabel.toLowerCase();
+    return handOpponentNames.has(label) || notesLower.includes(label);
+  });
+
+  const lines: string[] = [
+    "SESSION:",
+    `Date: ${session.date}`,
+    `Game: ${session.stakes} ${isTournament ? "tournament" : "cash game"} at ${session.location ?? "unknown venue"}${session.country ? `, ${session.country}` : ""}`,
+    `Result: ${sign}${sym}${Math.abs(session.profitLoss)} (buy-in ${sym}${session.buyIn}${isTournament ? "" : `, cash-out ${sym}${session.cashOut}`})${hours}`,
+  ];
+
+  if (isTournament) {
+    if (session.finishPosition != null)
+      lines.push(`Finish: ${session.finishPosition}/${session.totalEntrants ?? "?"}`);
+    if (session.prizeWon != null)
+      lines.push(`Prize: ${sym}${session.prizeWon}`);
+  }
+  if (session.rakePaid != null)
+    lines.push(`Rake/fees: ${sym}${session.rakePaid}`);
+  if (session.tableQuality != null)
+    lines.push(`Table quality: ${session.tableQuality}/5`);
+  if (session.handsPerHour != null)
+    lines.push(`Hands/hr: ${session.handsPerHour}`);
+  if (session.notes?.trim())
+    lines.push(`Player notes: "${session.notes}"`);
+
+  if (relevantReads.length > 0) {
+    lines.push("", `PLAYER READS (players confirmed present in this session):`);
+    for (const r of relevantReads) {
+      const tagStr = r.tags.length ? `[${r.tags.join(", ")}]` : "[no tags]";
+      lines.push(`• ${r.playerLabel} ${tagStr}${r.notes ? ` — "${r.notes}"` : ""}`);
+    }
+  }
+
+  const cap = Math.min(hands.length, 6);
+  if (cap > 0) {
+    lines.push("", `RECORDED HANDS (${cap} of ${hands.length}):`);
+    for (let i = 0; i < cap; i++) {
+      lines.push("", formatHand(hands[i], relevantReads, i));
+    }
+    lines.push(
+      "",
+      "Provide street-by-street coaching for each recorded hand, then an overall session narrative.",
+    );
+  } else {
+    lines.push(
+      "",
+      "No hands were recorded for this session. Provide an overall coaching narrative based on session data only.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
+// ── System prompt (cached by Anthropic on repeat calls) ──────────────────────
+
+const SYSTEM_PROMPT =
+  `You are an expert poker coach with deep knowledge of No-Limit Hold'em strategy at all stakes. Your coaching philosophy blends GTO foundations with practical exploitation of opponent tendencies.
+
+EXPERTISE AREAS:
+1. Preflop ranges: opening, 3-betting, 4-betting, defending from all positions in 6-max and full-ring. You know solver-approved frequencies and can adjust them for live poker where players deviate from GTO.
+2. Postflop: c-bet frequencies by board texture (dry/wet, paired, monotone), probe bets, delayed c-bets, check-raise construction, pot control, thin value, and bluff selection. You think in ranges, not just specific hands.
+3. Opponent exploitation: when reads or tags are provided, you shift from GTO balance toward exploitative plays — value-betting wider against calling stations, bluffing less against stations, 3-betting wider against nits, etc.
+4. Bet sizing: you understand the theory behind sizing (pot geometry, SPR, protection, polarisation vs merged ranges) and can diagnose sizing tells and errors.
+5. Mental game: you recognise tilt indicators in session data (extended sessions after early losses, multiple rebuys, late-night sessions) and address them directly but constructively.
+6. Bankroll management: you can contextualise a single session within long-run variance and advise on stake selection and shot-taking.
+7. Tournaments: ICM pressure, bubble play, push-fold strategy, deal-making, stage-appropriate adjustments.
+
+COACHING PRINCIPLES:
+- Be specific, not generic. "You bet too small" is weak. "A 35% pot bet on this dry board gives villain correct odds to call all mid pairs" is strong.
+- When reads/tags are provided, always reference them directly in your advice.
+- When no read exists on a villain, explicitly state you're defaulting to GTO population assumptions.
+- Be honest about variance. A losing session can be well-played; a winning session can contain leaks. Separate process from outcome.
+- Keep tone encouraging and growth-oriented.
+- Use null for streets a hand did not reach in your hand analyses.
+
+ACCURACY RULES — follow these precisely:
+
+1. CARD ACCURACY: Reproduce hole cards and board cards exactly as written in the hand history. Never infer, guess, or alter any rank or suit. If the hand says Hero holds "Ac Jh", you must write "Ac Jh" — not "Ah Jc" or any other variation. Board texture analysis must reflect the actual suits listed.
+
+2. BET-COUNTING: Count raises from the beginning of the preflop action. The BB post is not a raise. An open-raise is a 2-bet. A re-raise over an open is a 3-bet. A re-raise over a 3-bet is a 4-bet. A jam or re-raise over a 4-bet is a 5-bet. Never miscategorise a 4-bet as a 5-bet or vice versa. In postflop play: a first bet is simply a bet, a raise over it is a raise (2-bet), and a re-raise is a 3-bet.
+
+3. PLAYER READS SCOPE: Only reference reads and tags for opponents who appear by name in the recorded hands provided. Do not invent or assume the presence of any player not listed in a hand. If no reads are provided, default to GTO population assumptions for all opponents.
+
+4. TEXT FORMATTING: Write all string field values as plain prose only. Do not embed newline characters (\n), tab characters (\t), bullet symbols, markdown, or any other special characters inside string fields. Paragraphs in the narrative field must be separated by a double newline only.`;
+
+// ── Entry point ──────────────────────────────────────────────────────────────
+
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: cors });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+        status: 401,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json() as {
+      session: Session;
+      hands?: PokerHand[];
+      reads?: PlayerRead[];
+      forceRefresh?: boolean;
+    };
+
+    const { session, hands = [], reads = [], forceRefresh = false } = body;
+
+    // ── Cache check ──────────────────────────────────────────────────────────
+    if (!forceRefresh) {
+      const { data: cached } = await supabase
+        .from("ai_analyses")
+        .select("analysis_json")
+        .eq("session_id", session.id)
+        .maybeSingle();
+
+      if (cached) {
+        return new Response(JSON.stringify(cached.analysis_json), {
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // ── Call Claude with tool use ────────────────────────────────────────────
+    const anthropic = new Anthropic({
+      apiKey: Deno.env.get("ANTHROPIC_API_KEY")!,
+    });
+
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      system: [
+        {
+          type: "text",
+          text: SYSTEM_PROMPT,
+          // @ts-ignore — cache_control is valid but not yet in SDK types
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      tools: [ANALYSIS_TOOL],
+      // @ts-ignore — tool_choice is valid but may not be in SDK v0.24.3 types
+      tool_choice: { type: "tool", name: "provide_analysis" },
+      messages: [
+        { role: "user", content: buildUserPrompt(session, hands, reads) },
+      ],
+    });
+
+    // Tool use always returns valid structured JSON — no regex parsing needed
+    const toolBlock = message.content.find((c) => c.type === "tool_use");
+    if (!toolBlock || toolBlock.type !== "tool_use") {
+      throw new Error("Model did not return the analysis tool call");
+    }
+    // deno-lint-ignore no-explicit-any
+    const analysis = (toolBlock as any).input as Record<string, unknown>;
+
+    // ── Cache the result ─────────────────────────────────────────────────────
+    await supabase.from("ai_analyses").upsert(
+      {
+        user_id: user.id,
+        session_id: session.id,
+        analysis_json: analysis,
+        model_used: "claude-sonnet-4-6",
+        tokens_used: message.usage.input_tokens + message.usage.output_tokens,
+      },
+      { onConflict: "user_id,session_id" },
+    );
+
+    return new Response(JSON.stringify(analysis), {
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("analyze-session error:", msg);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+});

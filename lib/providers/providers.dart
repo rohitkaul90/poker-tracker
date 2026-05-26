@@ -4,6 +4,7 @@ import '../models/session_filter.dart';
 import '../models/hand_model.dart';
 import '../services/supabase_service.dart';
 import '../services/hand_service.dart';
+import '../services/ai_service.dart';
 
 export '../models/session_filter.dart' show SessionFilter, SessionResult;
 
@@ -54,3 +55,5 @@ final handServiceProvider = Provider<HandService>((ref) => HandService());
 final handsProvider = FutureProvider<List<PokerHand>>((ref) {
   return ref.read(handServiceProvider).fetchHands();
 });
+
+final aiServiceProvider = Provider<AiService>((ref) => AiService());

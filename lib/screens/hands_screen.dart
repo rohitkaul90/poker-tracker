@@ -6,6 +6,7 @@ import '../providers/providers.dart';
 import '../widgets/playing_card_widget.dart';
 import 'hand_input/hand_input_screen.dart';
 import 'hand_replayer/hand_replayer_screen.dart';
+import 'ai_analysis/hand_analysis_screen.dart';
 
 class HandsScreen extends ConsumerWidget {
   const HandsScreen({super.key});
@@ -211,9 +212,23 @@ class _HandTile extends ConsumerWidget {
                       )
                       .toList(),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
               ],
 
+              IconButton(
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                color: Colors.white38,
+                tooltip: 'AI Coaching',
+                padding: EdgeInsets.zero,
+                constraints:
+                    const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HandAnalysisScreen(hand: hand),
+                  ),
+                ),
+              ),
               const Icon(Icons.chevron_right, color: Colors.white24, size: 20),
             ],
           ),

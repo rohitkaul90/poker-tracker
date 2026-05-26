@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../models/hand_model.dart';
 import '../../widgets/playing_card_widget.dart';
 import '../../widgets/chip_stack_widget.dart';
+import '../ai_analysis/hand_analysis_screen.dart';
 
 // ── Replay data model ─────────────────────────────────────────────────────────
 
@@ -311,6 +312,16 @@ class _HandReplayerScreenState extends State<HandReplayerScreen> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome, size: 20),
+            tooltip: 'AI Coaching',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HandAnalysisScreen(hand: widget.hand),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.share_outlined, size: 20),
             tooltip: 'Share hand',
