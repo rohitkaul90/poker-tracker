@@ -358,7 +358,29 @@ ACCURACY RULES — follow these precisely:
 
 3. PLAYER READS SCOPE: Only reference reads and tags for opponents who appear by name in the recorded hands provided. Do not invent or assume the presence of any player not listed in a hand. If no reads are provided, default to GTO population assumptions for all opponents.
 
-4. TEXT FORMATTING: Write all string field values as plain prose only. Do not embed newline characters (\n), tab characters (\t), bullet symbols, markdown, or any other special characters inside string fields. Paragraphs in the narrative field must be separated by a double newline only.`;
+4. TEXT FORMATTING: Write all string field values as plain prose only. Do not embed newline characters (\n), tab characters (\t), bullet symbols, markdown, or any other special characters inside string fields. Paragraphs in the narrative field must be separated by a double newline only.
+
+5. HAND READING — before coaching any street, work through these steps:
+
+   STEP 1 — LIST CARDS: State hero's two hole cards and the current board cards with their exact ranks and suits as given. Never alter or infer any rank or suit.
+
+   STEP 2 — STRAIGHT DRAW CHECK: Collect all ranks present (hole cards + board). Find every 5-consecutive-rank window that contains 4 or more of those ranks:
+   • All 5 present → STRAIGHT (made hand).
+   • Exactly 4 present AND those 4 are fully consecutive (no internal gap) → OPEN-ENDED STRAIGHT DRAW (OESD, 8 outs): two different ranks (one at each end) complete it.
+   • Exactly 4 present AND there is exactly one rank missing inside the sequence → GUTSHOT (4 outs): only one specific rank completes it. A gutshot is NOT an OESD — do not confuse them.
+   Worked example: hero 7h8h on board 4c5dTh — ranks present: 4,5,7,8,T. Window 4-5-6-7-8: four ranks present (4,5,7,8), gap at 6 which is internal → GUTSHOT needing a 6 (4 outs). Window 6-7-8-9-T: only three ranks present → not a draw. Correct answer: GUTSHOT, not OESD.
+   Counterexample: hero 7h8h on board 5c6dTh — ranks present: 5,6,7,8,T. Window 5-6-7-8-9: four ranks present (5,6,7,8), all consecutive with no gap → OESD needing a 4 or 9 (8 outs).
+
+   STEP 3 — FLUSH DRAW CHECK: For each suit, count cards of that suit across hero's two hole cards plus current board cards:
+   • 5 of same suit → FLUSH (made).
+   • 4 of same suit → FLUSH DRAW (9 outs).
+   • 3 of same suit → BACKDOOR FLUSH DRAW only, not an immediate draw.
+   • 2 or fewer → no flush relevance.
+   Worked example: hero 7h8h on board 4c5dTh — hearts: 7h + 8h + Th = 3 hearts → BACKDOOR flush draw only, NOT a flush draw.
+
+   STEP 4 — MADE HAND: Identify the best made hand using hole cards + board: high card, one pair (top/middle/bottom pair by board rank), two pair, set (pocket pair matching board card), trips (one hole card + two board cards of same rank), straight, flush, full house, quads, straight flush.
+
+   STEP 5 — NEVER invent draws or made hands not supported by the cards listed in steps 1–4.`;
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
