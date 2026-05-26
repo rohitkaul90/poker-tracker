@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../models/hand_model.dart';
+import '../../models/session_model.dart';
+import '../../providers/providers.dart';
 import '../../widgets/playing_card_widget.dart';
 import '../../widgets/chip_stack_widget.dart';
 import '../ai_analysis/hand_analysis_screen.dart';
@@ -74,26 +77,28 @@ class _Frame {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class HandReplayerScreen extends StatefulWidget {
+class HandReplayerScreen extends ConsumerStatefulWidget {
   final PokerHand hand;
 
   const HandReplayerScreen({super.key, required this.hand});
 
   @override
-  State<HandReplayerScreen> createState() => _HandReplayerScreenState();
+  ConsumerState<HandReplayerScreen> createState() => _HandReplayerScreenState();
 }
 
-class _HandReplayerScreenState extends State<HandReplayerScreen> {
+class _HandReplayerScreenState extends ConsumerState<HandReplayerScreen> {
   late final List<_Frame> _frames;
   int _currentIndex = 0;
   bool _isPlaying = false;
   double _speed = 1.0;
   Timer? _timer;
+  late String? _sessionId;
 
   @override
   void initState() {
     super.initState();
     _frames = _buildFrames();
+    _sessionId = widget.hand.sessionId;
   }
 
   @override
@@ -327,6 +332,15 @@ class _HandReplayerScreenState extends State<HandReplayerScreen> {
             tooltip: 'Share hand',
             onPressed: _shareHand,
           ),
+          IconButton(
+            icon: Icon(
+              Icons.link,
+              size: 20,
+              color: _sessionId != null ? Colors.green.shade400 : Colors.white54,
+            ),
+            tooltip: _sessionId != null ? 'Linked to session (tap to change)' : 'Link to session',
+            onPressed: _showLinkSheet,
+          ),
           if (widget.hand.notes?.isNotEmpty == true)
             IconButton(
               icon: const Icon(Icons.note_outlined, size: 20),
@@ -486,6 +500,54 @@ class _HandReplayerScreenState extends State<HandReplayerScreen> {
         );
       }),
     );
+  }
+
+  // ── Link to session ───────────────────────────────────────────────────────
+
+  Future<void> _showLinkSheet() async {
+    final sessions = ref.read(sessionsProvider).valueOrNull ?? [];
+    if (sessions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No sessions saved yet. Log a session first.')),
+        );
+      }
+      return;
+    }
+    final sorted = [...sessions]..sort((a, b) => b.date.compareTo(a.date));
+    final recent = sorted.take(20).toList();
+
+    final result = await showModalBottomSheet<_LinkPick>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _SessionLinkSheet(
+        sessions: recent,
+        currentSessionId: _sessionId,
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    try {
+      await ref
+          .read(handServiceProvider)
+          .updateHandSession(widget.hand.id, result.sessionId);
+      if (!mounted) return;
+      setState(() => _sessionId = result.sessionId);
+      ref.invalidate(handsProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.sessionId == null
+              ? 'Session link removed.'
+              : 'Hand linked to session.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update: $e')),
+      );
+    }
   }
 
   // ── Share ─────────────────────────────────────────────────────────────────
@@ -889,6 +951,104 @@ class _ActionBadge extends StatelessWidget {
           maxLines: 1,
         ),
       );
+}
+
+// ── Session link sheet ────────────────────────────────────────────────────────
+
+class _LinkPick {
+  final String? sessionId;
+  const _LinkPick(this.sessionId);
+}
+
+class _SessionLinkSheet extends StatelessWidget {
+  final List<SessionModel> sessions;
+  final String? currentSessionId;
+
+  const _SessionLinkSheet({
+    required this.sessions,
+    required this.currentSessionId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.55,
+      minChildSize: 0.35,
+      maxChildSize: 0.85,
+      builder: (ctx, scrollController) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Text(
+              'Link to Session',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.link_off_outlined, color: Colors.white38, size: 20),
+            title: const Text('None (remove link)'),
+            selected: currentSessionId == null,
+            selectedTileColor: Colors.white10,
+            onTap: () => Navigator.of(ctx).pop(const _LinkPick(null)),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView.builder(
+              controller: scrollController,
+              itemCount: sessions.length,
+              itemBuilder: (_, i) {
+                final s = sessions[i];
+                final isLinked = s.id == currentSessionId;
+                final date = s.date.length >= 10 ? s.date.substring(0, 10) : s.date;
+                final pl = s.profitLoss;
+                final plStr =
+                    '${pl >= 0 ? '+' : ''}${pl.abs().toStringAsFixed(0)} ${s.currency}';
+                return ListTile(
+                  leading: Icon(
+                    isLinked ? Icons.link : Icons.calendar_today_outlined,
+                    size: 18,
+                    color: isLinked ? Colors.green.shade400 : Colors.white38,
+                  ),
+                  title: Text(
+                    '$date · ${s.stakes} · ${s.gameType}',
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    plStr,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: pl >= 0 ? Colors.green.shade300 : Colors.red.shade300,
+                    ),
+                  ),
+                  trailing: isLinked
+                      ? Icon(Icons.check, color: Colors.green.shade400, size: 16)
+                      : null,
+                  selected: isLinked,
+                  selectedTileColor: Colors.white10,
+                  onTap: () => Navigator.of(ctx).pop(_LinkPick(s.id)),
+                );
+              },
+            ),
+          ),
+          SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+        ],
+      ),
+    );
+  }
 }
 
 class _SpeedBtn extends StatelessWidget {

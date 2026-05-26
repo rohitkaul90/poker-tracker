@@ -69,6 +69,15 @@ class HandService {
     return hand;
   });
 
+  Future<void> updateHandSession(String handId, String? sessionId) =>
+      withSupabaseRetry(() async {
+        await _client
+            .from('hands')
+            .update({'session_id': sessionId})
+            .eq('id', handId)
+            .eq('user_id', _uid);
+      });
+
   Future<void> deleteHand(String handId) => withSupabaseRetry(() async {
     await _client
         .from('hands')
