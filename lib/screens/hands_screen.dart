@@ -8,11 +8,35 @@ import 'hand_input/hand_input_screen.dart';
 import 'hand_replayer/hand_replayer_screen.dart';
 import 'ai_analysis/hand_analysis_screen.dart';
 
-class HandsScreen extends ConsumerWidget {
+class HandsScreen extends ConsumerStatefulWidget {
   const HandsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HandsScreen> createState() => _HandsScreenState();
+}
+
+class _HandsScreenState extends ConsumerState<HandsScreen> {
+  // IDs optimistically removed from the list before the server round-trip
+  // completes — prevents the "dismissed Dismissible still in tree" assertion.
+  final _deletingIds = <String>{};
+
+  Future<void> _deleteHand(String handId) async {
+    setState(() => _deletingIds.add(handId));
+    try {
+      await ref.read(handServiceProvider).deleteHand(handId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deletingIds.remove(handId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete hand: $e')),
+      );
+      return;
+    }
+    if (mounted) ref.invalidate(handsProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final handsAsync = ref.watch(handsProvider);
 
     return Scaffold(
@@ -31,7 +55,9 @@ class HandsScreen extends ConsumerWidget {
           ),
         ),
         data: (hands) {
-          if (hands.isEmpty) {
+          final visible =
+              hands.where((h) => !_deletingIds.contains(h.id)).toList();
+          if (visible.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -59,8 +85,11 @@ class HandsScreen extends ConsumerWidget {
           }
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: hands.length,
-            itemBuilder: (ctx, i) => _HandTile(hand: hands[i]),
+            itemCount: visible.length,
+            itemBuilder: (ctx, i) => _HandTile(
+              hand: visible[i],
+              onDelete: () => _deleteHand(visible[i].id),
+            ),
           );
         },
       ),
@@ -80,13 +109,14 @@ class HandsScreen extends ConsumerWidget {
   }
 }
 
-class _HandTile extends ConsumerWidget {
+class _HandTile extends StatelessWidget {
   final PokerHand hand;
+  final VoidCallback onDelete;
 
-  const _HandTile({required this.hand});
+  const _HandTile({required this.hand, required this.onDelete});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final hero = hand.hero;
     final fmt = DateFormat('MMM d, y · h:mm a');
     final setup = hand.tableSetup;
@@ -124,14 +154,7 @@ class _HandTile extends ConsumerWidget {
           ],
         ),
       ),
-      onDismissed: (_) async {
-        try {
-          await ref.read(handServiceProvider).deleteHand(hand.id);
-        } catch (_) {
-          // refresh restores item if delete failed
-        }
-        ref.invalidate(handsProvider);
-      },
+      onDismissed: (_) => onDelete(),
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: InkWell(
@@ -142,99 +165,99 @@ class _HandTile extends ConsumerWidget {
               builder: (_) => HandReplayerScreen(hand: hand),
             ),
           ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              // Hero hole cards
-              Row(
-                children: [
-                  PlayingCard(
-                    card: hero?.holeCards?.isNotEmpty == true
-                        ? hero!.holeCards![0]
-                        : null,
-                    width: 30,
-                    height: 42,
-                  ),
-                  const SizedBox(width: 3),
-                  PlayingCard(
-                    card: hero?.holeCards?.length == 2 ? hero!.holeCards![1] : null,
-                    width: 30,
-                    height: 42,
-                  ),
-                ],
-              ),
-              const SizedBox(width: 14),
-
-              // Info column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // Hero hole cards
+                Row(
                   children: [
-                    Text(
-                      '$stakes · ${setup.numSeats}-max',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    PlayingCard(
+                      card: hero?.holeCards?.isNotEmpty == true
+                          ? hero!.holeCards![0]
+                          : null,
+                      width: 30,
+                      height: 42,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${hand.streetReached} · ${hand.players.length} players',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white60,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      fmt.format(hand.playedAt.toLocal()),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.white38,
-                      ),
+                    const SizedBox(width: 3),
+                    PlayingCard(
+                      card: hero?.holeCards?.length == 2 ? hero!.holeCards![1] : null,
+                      width: 30,
+                      height: 42,
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(width: 14),
 
-              // Community cards preview (up to 3)
-              if (hand.allCommunityCards.isNotEmpty) ...[
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: hand.allCommunityCards
-                      .take(3)
-                      .map(
-                        (c) => Padding(
-                          padding: const EdgeInsets.only(left: 2),
-                          child: PlayingCard(card: c, width: 22, height: 30),
+                // Info column
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$stakes · ${setup.numSeats}-max',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
                         ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(width: 4),
-              ],
-
-              IconButton(
-                icon: const Icon(Icons.auto_awesome, size: 18),
-                color: Colors.white38,
-                tooltip: 'AI Coaching',
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 32, minHeight: 32),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => HandAnalysisScreen(hand: hand),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${hand.streetReached} · ${hand.players.length} players',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white60,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        fmt.format(hand.playedAt.toLocal()),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white38,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: Colors.white24, size: 20),
-            ],
+
+                // Community cards preview (up to 3)
+                if (hand.allCommunityCards.isNotEmpty) ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: hand.allCommunityCards
+                        .take(3)
+                        .map(
+                          (c) => Padding(
+                            padding: const EdgeInsets.only(left: 2),
+                            child: PlayingCard(card: c, width: 22, height: 30),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome, size: 18),
+                  color: Colors.white38,
+                  tooltip: 'AI Coaching',
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => HandAnalysisScreen(hand: hand),
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white24, size: 20),
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 }
