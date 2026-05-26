@@ -165,6 +165,32 @@ const ANALYSIS_TOOL: any = {
   },
 };
 
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+
+const EXEMPT_EMAILS = new Set(["rhtk.1234@gmail.com"]);
+const SESSION_DAILY_LIMIT = 5;
+
+// deno-lint-ignore no-explicit-any
+async function isRateLimited(supabase: any, userId: string, userEmail: string | undefined): Promise<boolean> {
+  if (EXEMPT_EMAILS.has(userEmail ?? "")) return false;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from("ai_usage_log")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("function_name", "analyze-session")
+    .gte("called_at", since);
+  return (count ?? 0) >= SESSION_DAILY_LIMIT;
+}
+
+// deno-lint-ignore no-explicit-any
+async function logUsage(supabase: any, userId: string): Promise<void> {
+  await supabase.from("ai_usage_log").insert({
+    user_id: userId,
+    function_name: "analyze-session",
+  });
+}
+
 // ── Draw pre-computation (deterministic — injected as ground truth) ───────────
 
 const RANK_VAL: Record<string, number> = {
@@ -557,6 +583,14 @@ serve(async (req: Request) => {
       }
     }
 
+    // ── Rate limit check ─────────────────────────────────────────────────────
+    if (await isRateLimited(supabase, user.id, user.email ?? undefined)) {
+      return new Response(
+        JSON.stringify({ error: "Daily analysis limit reached. Please try again tomorrow." }),
+        { status: 429, headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
+
     // ── Call Claude with tool use ────────────────────────────────────────────
     const anthropic = new Anthropic({
       apiKey: Deno.env.get("ANTHROPIC_API_KEY")!,
@@ -588,6 +622,8 @@ serve(async (req: Request) => {
     }
     // deno-lint-ignore no-explicit-any
     const analysis = (toolBlock as any).input as Record<string, unknown>;
+
+    await logUsage(supabase, user.id);
 
     // ── Cache the result ─────────────────────────────────────────────────────
     await supabase.from("ai_analyses").upsert(
