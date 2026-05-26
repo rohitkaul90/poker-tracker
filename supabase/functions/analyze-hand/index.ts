@@ -102,6 +102,68 @@ const COACHING_TOOL: any = {
   },
 };
 
+// ── Draw pre-computation (deterministic — injected as ground truth) ───────────
+
+const RANK_VAL: Record<string, number> = {
+  "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7,
+  "8": 8, "9": 9, "T": 10, "J": 11, "Q": 12, "K": 13, "A": 14,
+};
+const VAL_RANK: Record<number, string> = {
+  14: "A", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6",
+  7: "7", 8: "8", 9: "9", 10: "T", 11: "J", 12: "Q", 13: "K",
+};
+
+function computeDrawSummary(holeCards: string[], boardCards: string[]): string {
+  const allCards = [...holeCards, ...boardCards];
+  const cRank = (c: string) => c.slice(0, -1);
+  const cSuit = (c: string) => c.slice(-1);
+
+  const presentVals = new Set(
+    allCards.map((c) => RANK_VAL[cRank(c)]).filter(Boolean),
+  );
+
+  // Straight draws: scan all 5-consecutive-rank windows (A-low included)
+  const completingVals = new Set<number>();
+  let madeStraight = false;
+  for (let low = 1; low <= 10; low++) {
+    const window = low === 1 ? [14, 2, 3, 4, 5] : [low, low+1, low+2, low+3, low+4];
+    const inW = window.filter((v) => presentVals.has(v));
+    const outW = window.filter((v) => !presentVals.has(v));
+    if (inW.length === 5) { madeStraight = true; break; }
+    if (inW.length === 4 && outW.length === 1) completingVals.add(outW[0]);
+  }
+
+  let straightLine: string;
+  if (madeStraight) {
+    straightLine = "STRAIGHT (made)";
+  } else if (completingVals.size === 0) {
+    straightLine = "no straight draw";
+  } else {
+    const rankList = [...completingVals].map((v) => VAL_RANK[v]).join(" or ");
+    const outs = completingVals.size * 4;
+    straightLine = completingVals.size === 1
+      ? `GUTSHOT — needs ${rankList} (${outs} outs)`
+      : `OESD — needs ${rankList} (${outs} outs)`;
+  }
+
+  // Flush draws: count by suit across all cards
+  const suitCards: Record<string, string[]> = { h: [], d: [], c: [], s: [] };
+  const suitName: Record<string, string> = { h: "hearts", d: "diamonds", c: "clubs", s: "spades" };
+  for (const card of allCards) {
+    const s = cSuit(card);
+    if (s in suitCards) suitCards[s].push(card);
+  }
+  const flushParts: string[] = [];
+  for (const [s, cards] of Object.entries(suitCards)) {
+    if (cards.length >= 5) flushParts.push(`FLUSH made (${suitName[s]})`);
+    else if (cards.length === 4) flushParts.push(`FLUSH DRAW (${suitName[s]}, 9 outs) [${cards.join(" ")}]`);
+    else if (cards.length === 3) flushParts.push(`backdoor flush draw only (${suitName[s]}) [${cards.join(" ")}]`);
+  }
+  const flushLine = flushParts.length ? flushParts.join("; ") : "no flush draw";
+
+  return `[FACT — hero's draws on this board: ${straightLine} | ${flushLine}. These are pre-computed and correct. Do not contradict them.]`;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function positionName(seat: number, setup: TableSetup): string {
@@ -165,8 +227,10 @@ function buildPrompt(hand: PokerHand, reads: PlayerRead[]): string {
 
   if (board.length) lines.push(`Final board: ${board.join(" ")}`);
 
-  // Street-by-street action log
+  // Street-by-street action log with pre-computed draw facts
+  const boardSoFar: string[] = [];
   for (const street of streets) {
+    boardSoFar.push(...street.communityCards);
     const label = street.street.toUpperCase();
     const cc = street.communityCards.length
       ? ` [${street.communityCards.join(" ")}]`
@@ -180,6 +244,9 @@ function buildPrompt(hand: PokerHand, reads: PlayerRead[]): string {
       .filter(Boolean)
       .join("; ");
     lines.push(`${label}${cc}: ${actionStr}`);
+    if (hero?.holeCards?.length === 2 && boardSoFar.length > 0) {
+      lines.push(computeDrawSummary(hero.holeCards, boardSoFar));
+    }
   }
 
   if (hand.notes) lines.push(`Hand note: "${hand.notes}"`);
