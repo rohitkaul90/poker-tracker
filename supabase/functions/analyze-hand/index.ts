@@ -118,11 +118,12 @@ function computeDrawSummary(holeCards: string[], boardCards: string[]): string {
   const cRank = (c: string) => c.slice(0, -1);
   const cSuit = (c: string) => c.slice(-1);
 
-  const presentVals = new Set(
-    allCards.map((c) => RANK_VAL[cRank(c)]).filter(Boolean),
-  );
+  const holeRanks = holeCards.map(cRank);
+  const boardRanks = boardCards.map(cRank);
+  const boardVals = boardRanks.map((r) => RANK_VAL[r] ?? 0).sort((a, b) => b - a);
+  const presentVals = new Set(allCards.map((c) => RANK_VAL[cRank(c)]).filter(Boolean));
 
-  // Straight draws: scan all 5-consecutive-rank windows (A-low included)
+  // ── Straight draws ────────────────────────────────────────────────────────
   const completingVals = new Set<number>();
   let madeStraight = false;
   for (let low = 1; low <= 10; low++) {
@@ -146,22 +147,78 @@ function computeDrawSummary(holeCards: string[], boardCards: string[]): string {
       : `OESD — needs ${rankList} (${outs} outs)`;
   }
 
-  // Flush draws: count by suit across all cards
+  // ── Flush draws ───────────────────────────────────────────────────────────
   const suitCards: Record<string, string[]> = { h: [], d: [], c: [], s: [] };
   const suitName: Record<string, string> = { h: "hearts", d: "diamonds", c: "clubs", s: "spades" };
   for (const card of allCards) {
     const s = cSuit(card);
     if (s in suitCards) suitCards[s].push(card);
   }
+  let madeFlush = false;
   const flushParts: string[] = [];
   for (const [s, cards] of Object.entries(suitCards)) {
-    if (cards.length >= 5) flushParts.push(`FLUSH made (${suitName[s]})`);
+    if (cards.length >= 5) { madeFlush = true; flushParts.push(`FLUSH made (${suitName[s]})`); }
     else if (cards.length === 4) flushParts.push(`FLUSH DRAW (${suitName[s]}, 9 outs) [${cards.join(" ")}]`);
     else if (cards.length === 3) flushParts.push(`backdoor flush draw only (${suitName[s]}) [${cards.join(" ")}]`);
   }
   const flushLine = flushParts.length ? flushParts.join("; ") : "no flush draw";
 
-  return `[FACT — hero's draws on this board: ${straightLine} | ${flushLine}. These are pre-computed and correct. Do not contradict them.]`;
+  // ── Made hand ─────────────────────────────────────────────────────────────
+  const rankCnt: Record<string, number> = {};
+  for (const c of allCards) { const r = cRank(c); rankCnt[r] = (rankCnt[r] ?? 0) + 1; }
+
+  const byCount = (n: number) =>
+    Object.entries(rankCnt).filter(([, cnt]) => cnt === n).map(([r]) => r)
+      .sort((a, b) => (RANK_VAL[b] ?? 0) - (RANK_VAL[a] ?? 0));
+
+  const quads = byCount(4);
+  const trips = byCount(3);
+  const pairs = byCount(2);
+
+  let madeHand: string;
+
+  if (quads.length > 0) {
+    madeHand = `QUADS (four ${quads[0]}s)`;
+  } else if (trips.length > 0 && (pairs.length > 0 || trips.length > 1)) {
+    const fhPair = trips.length > 1 ? trips[1] : pairs[0];
+    madeHand = `FULL HOUSE (${trips[0]}s full of ${fhPair}s)`;
+  } else if (madeFlush && madeStraight) {
+    madeHand = "STRAIGHT FLUSH";
+  } else if (madeFlush) {
+    madeHand = flushParts[0];
+  } else if (madeStraight) {
+    madeHand = "STRAIGHT (made)";
+  } else if (trips.length > 0) {
+    const tr = trips[0];
+    const isSet = holeRanks[0] === holeRanks[1] && holeRanks[0] === tr;
+    madeHand = isSet ? `SET (pocket ${tr}s)` : `TRIPS (three ${tr}s, one in hand)`;
+  } else if (pairs.length >= 2) {
+    madeHand = `TWO PAIR (${pairs[0]}s and ${pairs[1]}s)`;
+  } else if (pairs.length === 1) {
+    const pr = pairs[0];
+    const pv = RANK_VAL[pr] ?? 0;
+    if (holeRanks[0] === holeRanks[1] && holeRanks[0] === pr) {
+      // Pocket pair (no trips/quads hit)
+      const topBoard = boardVals[0] ?? 0;
+      madeHand = pv > topBoard ? `OVERPAIR (pocket ${pr}s)` : `UNDERPAIR (pocket ${pr}s)`;
+    } else if (boardRanks.filter((r) => r === pr).length === 2) {
+      // Both paired cards on board — hero plays kicker
+      const bestHole = [...holeRanks].sort((a, b) => (RANK_VAL[b] ?? 0) - (RANK_VAL[a] ?? 0))[0];
+      madeHand = `BOARD PAIR of ${pr}s (hero's kicker: ${bestHole})`;
+    } else {
+      // One hole card pairs with board
+      const kicker = holeRanks.find((r) => r !== pr) ?? holeRanks[1];
+      const uniqueBoardVals = [...new Set(boardVals)].sort((a, b) => b - a);
+      if (pv === uniqueBoardVals[0]) madeHand = `TOP PAIR (${pr}s, kicker ${kicker})`;
+      else if (uniqueBoardVals.length >= 2 && pv === uniqueBoardVals[1]) madeHand = `MIDDLE PAIR (${pr}s, kicker ${kicker})`;
+      else madeHand = `BOTTOM PAIR (${pr}s, kicker ${kicker})`;
+    }
+  } else {
+    const bestHole = [...holeRanks].sort((a, b) => (RANK_VAL[b] ?? 0) - (RANK_VAL[a] ?? 0))[0];
+    madeHand = `HIGH CARD (best hole card: ${bestHole})`;
+  }
+
+  return `[FACT — hero's hand: ${madeHand} | straight: ${straightLine} | flush: ${flushLine}. Pre-computed. Do not contradict.]`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
