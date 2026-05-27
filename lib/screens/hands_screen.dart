@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/hand_model.dart';
 import '../providers/providers.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/playing_card_widget.dart';
 import 'hand_input/hand_input_screen.dart';
 import 'hand_replayer/hand_replayer_screen.dart';
@@ -41,6 +42,10 @@ class _HandsScreenState extends ConsumerState<HandsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
+        ),
         title: const Text('Hands'),
         centerTitle: true,
       ),

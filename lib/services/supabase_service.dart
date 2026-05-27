@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/session_model.dart';
+import '../models/tournament_listing.dart';
 import 'supabase_retry.dart';
 
 class SupabaseService {
@@ -85,5 +86,13 @@ class SupabaseService {
       'stakes': stakes,
       'rake_amount': amount,
     }, onConflict: 'user_id,location,game_type,stakes'));
+  }
+
+  Future<List<TournamentListing>> fetchTournamentListings() async {
+    final rows = await withSupabaseRetry(() => _client
+        .from('tournament_listings')
+        .select()
+        .order('start_date'));
+    return (rows as List).map((r) => TournamentListing.fromMap(r as Map<String, dynamic>)).toList();
   }
 }

@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/profile_provider.dart';
 import '../screens/profile_screen.dart';
 import '../screens/about_screen.dart';
+import '../screens/data_privacy_screen.dart';
 import '../screens/help_screen.dart';
+import '../screens/equity_calculator_screen.dart';
+import '../screens/icm_calculator_screen.dart';
+
+// Key for the root nav scaffold so any tab screen can open the drawer.
+final mainScaffoldKey = GlobalKey<ScaffoldState>();
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -93,70 +100,152 @@ class AppDrawer extends ConsumerWidget {
             ),
             const Divider(height: 1),
 
-            // ── Profile nav item ───────────────────────────────────────────
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('Profile'),
-              subtitle: const Text('Name, phone, preferences',
-                  style: TextStyle(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                );
-              },
-            ),
+            // ── Scrollable middle section ──────────────────────────────────
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── Profile nav item ─────────────────────────────────
+                    ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: const Text('Profile'),
+                      subtitle: const Text('Name, phone, preferences',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ProfileScreen()),
+                        );
+                      },
+                    ),
 
-            const Divider(height: 1),
+                    const Divider(height: 1),
 
-            // ── App section ────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-              child: Text(
-                'APP',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                  color: theme.colorScheme.primary,
+                    // ── App section ──────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                      child: Text(
+                        'APP',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.help_outline_rounded),
+                      title: const Text('Help & FAQ'),
+                      subtitle: const Text('Features, tips, common questions',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const HelpScreen()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: const Text('About TableLab'),
+                      subtitle: const Text('What we\'re building and why',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AboutScreen()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.privacy_tip_outlined),
+                      title: const Text('Data & Privacy'),
+                      subtitle: const Text('What we store and how we use it',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const DataPrivacyScreen()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.feedback_outlined),
+                      title: const Text('Send Feedback'),
+                      subtitle: const Text('Bugs, ideas, suggestions',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        launchUrl(Uri(
+                          scheme: 'mailto',
+                          path: 'rhtk.1234@gmail.com',
+                          queryParameters: {'subject': 'TableLab Feedback'},
+                        ));
+                      },
+                    ),
+
+                    const Divider(height: 1),
+
+                    // ── Tools section ────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                      child: Text(
+                        'TOOLS',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.percent),
+                      title: const Text('Equity Calculator'),
+                      subtitle: const Text('Hand vs range equity',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const EquityCalculatorScreen()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.calculate_outlined),
+                      title: const Text('ICM Deal Calculator'),
+                      subtitle: const Text('Fair chip-chop deals at final tables',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const IcmCalculatorScreen()),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.help_outline_rounded),
-              title: const Text('Help & FAQ'),
-              subtitle: const Text('Features, tips, common questions',
-                  style: TextStyle(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HelpScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('About TableLab'),
-              subtitle: const Text('What we\'re building and why',
-                  style: TextStyle(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AboutScreen()),
-                );
-              },
-            ),
 
-            const Spacer(),
+            // ── Sign out (pinned) ──────────────────────────────────────────
             const Divider(height: 1),
-
-            // ── Sign out ───────────────────────────────────────────────────
             ListTile(
-              leading:
-                  Icon(Icons.logout, color: theme.colorScheme.error),
+              leading: Icon(Icons.logout, color: theme.colorScheme.error),
               title: Text(
                 'Sign Out',
                 style: TextStyle(color: theme.colorScheme.error),

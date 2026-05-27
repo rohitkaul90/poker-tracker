@@ -135,12 +135,14 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
     final theme = Theme.of(context);
     final isExisting = widget.existingPlayer != null;
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.78,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scroll) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.78,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scroll) {
         return Column(
           children: [
             _Handle(),
@@ -411,6 +413,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
           ],
         );
       },
+    ),
     );
   }
 }

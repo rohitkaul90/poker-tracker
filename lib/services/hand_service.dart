@@ -46,6 +46,7 @@ class HandService {
     required List<StreetData> streets,
     String? sessionId,
     String? notes,
+    String? tournamentStage,
   }) => withSupabaseRetry(() async {
     final id = _uuid();
     final now = DateTime.now();
@@ -58,6 +59,7 @@ class HandService {
       players: players,
       streets: streets,
       notes: notes,
+      tournamentStage: tournamentStage,
     );
     await _client.from('hands').insert({
       'id': id,

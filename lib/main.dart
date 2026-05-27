@@ -4,10 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth/auth_gate.dart';
 import 'config/supabase_config.dart';
 import 'screens/dashboard_screen.dart';
-import 'screens/equity_calculator_screen.dart';
 import 'screens/hands_screen.dart';
 import 'screens/reads_screen.dart';
 import 'screens/session_history_screen.dart';
+import 'screens/tournament_calendar_screen.dart';
+import 'widgets/app_drawer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,14 +52,16 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: mainScaffoldKey,
+      drawer: const AppDrawer(),
       body: IndexedStack(
         index: _currentIndex,
         children: const [
           DashboardScreen(),
           SessionHistoryScreen(),
           HandsScreen(),
-          EquityCalculatorScreen(),
           ReadsScreen(),
+          TournamentCalendarScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -81,14 +84,14 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Hands',
           ),
           NavigationDestination(
-            icon: Icon(Icons.calculate_outlined),
-            selectedIcon: Icon(Icons.calculate),
-            label: 'Equity',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.psychology_outlined),
             selectedIcon: Icon(Icons.psychology),
             label: 'Reads',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.event_outlined),
+            selectedIcon: Icon(Icons.event),
+            label: 'Calendar',
           ),
         ],
       ),

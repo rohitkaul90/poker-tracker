@@ -152,10 +152,23 @@ class _HandReplayerScreenState extends ConsumerState<HandReplayerScreen> {
       ));
     }
 
+    final isTournament = hand.tournamentStage != null || setup.ante != null;
+    final heroStartStack = hand.players
+        .where((p) => p.isHero)
+        .map((p) => p.startingStack)
+        .firstOrNull;
+    final heroEffBb = (heroStartStack != null && setup.bigBlind > 0)
+        ? heroStartStack ~/ setup.bigBlind
+        : null;
+
     addFrame(
-      'Hand starts · ${setup.numSeats}-max · '
-      '\$${setup.smallBlind}/\$${setup.bigBlind}'
-      '${setup.straddle != null ? '/\$${setup.straddle}' : ''}',
+      isTournament
+          ? 'Hand starts · ${setup.numSeats}-max · ${setup.smallBlind}/${setup.bigBlind}'
+              '${setup.ante != null ? ' ante ${setup.ante}' : ''}'
+              '${heroEffBb != null ? ' · Hero ${heroEffBb}bb' : ''}'
+          : 'Hand starts · ${setup.numSeats}-max · '
+              '\$${setup.smallBlind}/\$${setup.bigBlind}'
+              '${setup.straddle != null ? '/\$${setup.straddle}' : ''}',
       'Pre-flop',
     );
 
@@ -212,8 +225,11 @@ class _HandReplayerScreenState extends ConsumerState<HandReplayerScreen> {
             break;
         }
 
+        final bbAnnotation = (isTournament && action.amount != null && action.amount! > 0)
+            ? ' (${(action.amount! / setup.bigBlind).round()}bb)'
+            : '';
         addFrame(
-          '${setup.positionName(seat)} ${action.label}',
+          '${setup.positionName(seat)} ${action.label}$bbAnnotation',
           streetLabel,
           highlightedSeat: seat,
           actionLabel: action.label,
@@ -311,9 +327,34 @@ class _HandReplayerScreenState extends ConsumerState<HandReplayerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
-          '${frame.streetLabel} · $total-max',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${frame.streetLabel} · $total-max',
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            if (widget.hand.tournamentStage != null)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withAlpha(40),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: Colors.amber.withAlpha(120), width: 0.5),
+                ),
+                child: Text(
+                  _stageBadgeLabel(widget.hand.tournamentStage!),
+                  style: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.amber,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+          ],
         ),
         centerTitle: true,
         actions: [
@@ -640,6 +681,17 @@ class _HandReplayerScreenState extends ConsumerState<HandReplayerScreen> {
   }
 
   static int _hour12(int h) => h == 0 ? 12 : h > 12 ? h - 12 : h;
+
+  static String _stageBadgeLabel(String stage) => switch (stage) {
+        'early' => 'EARLY STAGES',
+        'middle' => 'MIDDLE STAGES',
+        'late' => 'LATE STAGES',
+        'bubble' => 'BUBBLE',
+        'itm' => 'IN THE MONEY',
+        'ft_bubble' => 'FT BUBBLE',
+        'final_table' => 'FINAL TABLE',
+        _ => stage.toUpperCase(),
+      };
 
   void _showNotes(BuildContext context) {
     showDialog(

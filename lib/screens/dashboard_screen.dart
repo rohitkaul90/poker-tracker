@@ -144,8 +144,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final showFab = _tabController.index == 0;
 
     return Scaffold(
-      drawer: const AppDrawer(),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
+        ),
         title: const Text('Dashboard'),
         actions: [
           if (_tabController.index == 0)

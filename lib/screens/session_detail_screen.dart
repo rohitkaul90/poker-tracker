@@ -202,6 +202,7 @@ class SessionDetailScreen extends ConsumerWidget {
                   prefilledStakes: session.stakes,
                   prefilledSessionLabel:
                       '${DateFormat('MMM d').format(DateTime.parse(session.date))}  ·  ${session.stakes}',
+                  isTournamentSession: isTournament,
                 ),
               ),
             ),

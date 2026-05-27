@@ -39,6 +39,7 @@ interface TableSetup {
   smallBlind: number;
   bigBlind: number;
   straddle?: number;
+  ante?: number;
 }
 
 interface PokerHand {
@@ -47,6 +48,7 @@ interface PokerHand {
   players: HandPlayer[];
   streets: StreetData[];
   notes?: string;
+  tournamentStage?: string;
 }
 
 interface PlayerRead {
@@ -149,28 +151,66 @@ function computeDrawSummary(holeCards: string[], boardCards: string[]): string {
   const boardVals = boardRanks.map((r) => RANK_VAL[r] ?? 0).sort((a, b) => b - a);
   const presentVals = new Set(allCards.map((c) => RANK_VAL[cRank(c)]).filter(Boolean));
 
-  // ── Straight draws ────────────────────────────────────────────────────────
+  // ── Straight draws (highest window first) ─────────────────────────────────
   const completingVals = new Set<number>();
   let madeStraight = false;
-  for (let low = 1; low <= 10; low++) {
+  let straightCards: string[] = [];
+  for (let low = 10; low >= 1; low--) {
     const window = low === 1 ? [14, 2, 3, 4, 5] : [low, low+1, low+2, low+3, low+4];
     const inW = window.filter((v) => presentVals.has(v));
     const outW = window.filter((v) => !presentVals.has(v));
-    if (inW.length === 5) { madeStraight = true; break; }
-    if (inW.length === 4 && outW.length === 1) completingVals.add(outW[0]);
+    if (inW.length === 5) {
+      madeStraight = true;
+      // Identify the specific cards forming this straight
+      for (const v of window) {
+        const card = allCards.find((c) => RANK_VAL[cRank(c)] === v);
+        if (card) straightCards.push(card);
+      }
+      break;
+    }
+    if (!madeStraight && inW.length === 4 && outW.length === 1) completingVals.add(outW[0]);
   }
+  // Also scan upward for draws if no made straight
+  if (!madeStraight) {
+    for (let low = 1; low <= 10; low++) {
+      const window = low === 1 ? [14, 2, 3, 4, 5] : [low, low+1, low+2, low+3, low+4];
+      const inW = window.filter((v) => presentVals.has(v));
+      const outW = window.filter((v) => !presentVals.has(v));
+      if (inW.length === 4 && outW.length === 1) completingVals.add(outW[0]);
+    }
+  }
+
+  // Classify hole-card contribution to the straight draw
+  const holeVals = new Set(holeCards.map((c) => RANK_VAL[cRank(c)]));
+  const holeInDraw = [...completingVals].length > 0
+    ? holeCards.filter((c) => {
+        const v = RANK_VAL[cRank(c)];
+        // Check if this hole card participates in any completing window
+        return [...completingVals].some((cv) => {
+          for (let low = 1; low <= 10; low++) {
+            const w = low === 1 ? [14,2,3,4,5] : [low,low+1,low+2,low+3,low+4];
+            if (!w.includes(cv)) continue;
+            if (w.filter((x) => presentVals.has(x)).length === 4 && w.includes(v)) return true;
+          }
+          return false;
+        });
+      })
+    : [];
 
   let straightLine: string;
   if (madeStraight) {
-    straightLine = "STRAIGHT (made)";
+    const holeInStraight = straightCards.filter((c) => holeCards.includes(c));
+    const boardInStraight = straightCards.filter((c) => boardCards.includes(c));
+    straightLine = `STRAIGHT (made: ${straightCards.join("-")}; hero's hole cards in straight: ${holeInStraight.join(" ")}; board cards in straight: ${boardInStraight.join(" ")})`;
   } else if (completingVals.size === 0) {
     straightLine = "no straight draw";
   } else {
     const rankList = [...completingVals].map((v) => VAL_RANK[v]).join(" or ");
     const outs = completingVals.size * 4;
+    const holeNote = holeInDraw.length ? ` [hero's hole cards in draw: ${holeInDraw.join(" ")}]` : "";
     straightLine = completingVals.size === 1
-      ? `GUTSHOT — needs ${rankList} (${outs} outs)`
-      : `OESD — needs ${rankList} (${outs} outs)`;
+      ? `GUTSHOT — needs ${rankList} (${outs} outs)${holeNote}`
+      : `OESD — needs ${rankList} (${outs} outs)${holeNote}`;
   }
 
   // ── Flush draws ───────────────────────────────────────────────────────────
@@ -183,9 +223,10 @@ function computeDrawSummary(holeCards: string[], boardCards: string[]): string {
   let madeFlush = false;
   const flushParts: string[] = [];
   for (const [s, cards] of Object.entries(suitCards)) {
-    if (cards.length >= 5) { madeFlush = true; flushParts.push(`FLUSH made (${suitName[s]})`); }
-    else if (cards.length === 4) flushParts.push(`FLUSH DRAW (${suitName[s]}, 9 outs) [${cards.join(" ")}]`);
-    else if (cards.length === 3) flushParts.push(`backdoor flush draw only (${suitName[s]}) [${cards.join(" ")}]`);
+    const holeOfSuit = holeCards.filter((c) => cSuit(c) === s);
+    if (cards.length >= 5) { madeFlush = true; flushParts.push(`FLUSH made (${suitName[s]}; hero's hole cards: ${holeOfSuit.join(" ")})`); }
+    else if (cards.length === 4) flushParts.push(`FLUSH DRAW (${suitName[s]}, 9 outs; hero's hole cards of this suit: ${holeOfSuit.join(" ")}) [all: ${cards.join(" ")}]`);
+    else if (cards.length === 3) flushParts.push(`backdoor flush draw only (${suitName[s]}; hero's hole cards of this suit: ${holeOfSuit.join(" ")}) [all: ${cards.join(" ")}]`);
   }
   const flushLine = flushParts.length ? flushParts.join("; ") : "no flush draw";
 
@@ -213,38 +254,39 @@ function computeDrawSummary(holeCards: string[], boardCards: string[]): string {
   } else if (madeFlush) {
     madeHand = flushParts[0];
   } else if (madeStraight) {
-    madeHand = "STRAIGHT (made)";
+    madeHand = straightLine; // already detailed above
   } else if (trips.length > 0) {
     const tr = trips[0];
     const isSet = holeRanks[0] === holeRanks[1] && holeRanks[0] === tr;
-    madeHand = isSet ? `SET (pocket ${tr}s)` : `TRIPS (three ${tr}s, one in hand)`;
+    madeHand = isSet ? `SET (pocket ${tr}s, hole cards: ${holeCards.join(" ")})` : `TRIPS (three ${tr}s; hero's hole card: ${holeCards.find((c) => cRank(c) === tr) ?? "?"}; other hole card: ${holeCards.find((c) => cRank(c) !== tr) ?? "?"})`;
   } else if (pairs.length >= 2) {
-    madeHand = `TWO PAIR (${pairs[0]}s and ${pairs[1]}s)`;
+    const h0 = holeCards.find((c) => cRank(c) === pairs[0]);
+    const h1 = holeCards.find((c) => cRank(c) === pairs[1]);
+    const desc = h0 && h1 ? ` (both from hole cards)` : h0 || h1 ? ` (one from hole card ${h0 ?? h1})` : ` (both from board; hero plays kicker)`;
+    madeHand = `TWO PAIR (${pairs[0]}s and ${pairs[1]}s${desc})`;
   } else if (pairs.length === 1) {
     const pr = pairs[0];
     const pv = RANK_VAL[pr] ?? 0;
     if (holeRanks[0] === holeRanks[1] && holeRanks[0] === pr) {
-      // Pocket pair (no trips/quads hit)
       const topBoard = boardVals[0] ?? 0;
-      madeHand = pv > topBoard ? `OVERPAIR (pocket ${pr}s)` : `UNDERPAIR (pocket ${pr}s)`;
+      madeHand = pv > topBoard ? `OVERPAIR (pocket ${pr}s, hole cards: ${holeCards.join(" ")})` : `UNDERPAIR (pocket ${pr}s, hole cards: ${holeCards.join(" ")})`;
     } else if (boardRanks.filter((r) => r === pr).length === 2) {
-      // Both paired cards on board — hero plays kicker
       const bestHole = [...holeRanks].sort((a, b) => (RANK_VAL[b] ?? 0) - (RANK_VAL[a] ?? 0))[0];
-      madeHand = `BOARD PAIR of ${pr}s (hero's kicker: ${bestHole})`;
+      madeHand = `BOARD PAIR of ${pr}s (hero plays kicker ${bestHole}; hole cards: ${holeCards.join(" ")})`;
     } else {
-      // One hole card pairs with board
-      const kicker = holeRanks.find((r) => r !== pr) ?? holeRanks[1];
+      const pairingHoleCard = holeCards.find((c) => cRank(c) === pr) ?? "?";
+      const kicker = holeCards.find((c) => cRank(c) !== pr) ?? holeCards[1];
       const uniqueBoardVals = [...new Set(boardVals)].sort((a, b) => b - a);
-      if (pv === uniqueBoardVals[0]) madeHand = `TOP PAIR (${pr}s, kicker ${kicker})`;
-      else if (uniqueBoardVals.length >= 2 && pv === uniqueBoardVals[1]) madeHand = `MIDDLE PAIR (${pr}s, kicker ${kicker})`;
-      else madeHand = `BOTTOM PAIR (${pr}s, kicker ${kicker})`;
+      if (pv === uniqueBoardVals[0]) madeHand = `TOP PAIR (${pr}s; hole card making the pair: ${pairingHoleCard}; kicker: ${kicker})`;
+      else if (uniqueBoardVals.length >= 2 && pv === uniqueBoardVals[1]) madeHand = `MIDDLE PAIR (${pr}s; hole card making the pair: ${pairingHoleCard}; kicker: ${kicker})`;
+      else madeHand = `BOTTOM PAIR (${pr}s; hole card making the pair: ${pairingHoleCard}; kicker: ${kicker})`;
     }
   } else {
     const bestHole = [...holeRanks].sort((a, b) => (RANK_VAL[b] ?? 0) - (RANK_VAL[a] ?? 0))[0];
-    madeHand = `HIGH CARD (best hole card: ${bestHole})`;
+    madeHand = `HIGH CARD (best hole card: ${bestHole}; hole cards: ${holeCards.join(" ")})`;
   }
 
-  return `[FACT — hero's hand: ${madeHand} | straight: ${straightLine} | flush: ${flushLine}. Pre-computed. Do not contradict.]`;
+  return `[FACT — hero's hole cards: ${holeCards.join(" ")} | board cards: ${boardCards.join(" ")} | made hand: ${madeHand} | straight status: ${straightLine} | flush status: ${flushLine}. These are pre-computed ground truth. Do not contradict or alter.]`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -260,22 +302,6 @@ function positionName(seat: number, setup: TableSetup): string {
   return off < n.length ? n[off] : `P${seat + 1}`;
 }
 
-function formatAction(a: HandAction, playerName: string, pos: string): string {
-  const who = `${playerName}(${pos})`;
-  switch (a.type) {
-    case "fold": return `${who} folds`;
-    case "check": return `${who} checks`;
-    case "call": return `${who} calls ${a.amount ?? 0}`;
-    case "raise": return a.openingBet
-      ? `${who} bets ${a.amount ?? 0}`
-      : `${who} raises to ${a.amount ?? 0}${a.allIn ? " (all-in)" : ""}`;
-    case "allIn": return `${who} all-in for ${a.amount ?? 0}`;
-    case "post": return `${who} posts ${a.amount ?? 0}`;
-    case "postStraddle": return `${who} straddles ${a.amount ?? 0}`;
-    default: return `${who} ${a.type}`;
-  }
-}
-
 function buildPrompt(hand: PokerHand, reads: PlayerRead[]): string {
   const { tableSetup: ts, players, streets } = hand;
   const seatMap = new Map(players.map((p) => [p.seat, p]));
@@ -286,10 +312,38 @@ function buildPrompt(hand: PokerHand, reads: PlayerRead[]): string {
   const heroCards = hero?.holeCards?.join(" ") ?? "??";
   const board = streets.flatMap((s) => s.communityCards);
 
+  const heroEffBb = hero && ts.bigBlind > 0
+    ? Math.floor(hero.stack / ts.bigBlind)
+    : null;
+
+  const stageLabels: Record<string, string> = {
+    early: "Early stages (Day 1/2)",
+    middle: "Middle stages",
+    late: "Late stages",
+    bubble: "ON THE BUBBLE — ICM pressure critical",
+    itm: "In the money (ITM)",
+    ft_bubble: "FINAL TABLE BUBBLE — extreme ICM pressure",
+    final_table: "Final table",
+  };
+  const stageLabel = hand.tournamentStage ? (stageLabels[hand.tournamentStage] ?? hand.tournamentStage) : null;
+  const isTournament = !!stageLabel || ts.ante != null;
+
+  const blindStr = isTournament
+    ? `${ts.smallBlind}/${ts.bigBlind}${ts.ante != null ? ` (ante ${ts.ante})` : ""}`
+    : `$${ts.smallBlind}/$${ts.bigBlind}${ts.straddle ? `/$${ts.straddle}` : ""}`;
+
+  const stackStr = isTournament
+    ? `${hero?.stack ?? "?"} chips${heroEffBb != null ? ` (${heroEffBb}bb effective)` : ""}`
+    : `$${hero?.stack ?? "?"}`;
+
   const lines: string[] = [
     "HAND TO ANALYZE:",
-    `Hero: [${heroCards}] in ${heroPos} | ${ts.numSeats}-handed | $${ts.smallBlind}/$${ts.bigBlind}${ts.straddle ? `/$${ts.straddle}` : ""} blinds | Starting stack $${hero?.stack ?? "?"}`,
+    `Hero: [${heroCards}] in ${heroPos} | ${ts.numSeats}-handed | ${blindStr} blinds | Starting stack ${stackStr}`,
   ];
+
+  if (stageLabel) {
+    lines.push(`Tournament stage: ${stageLabel}`);
+  }
 
   // Opponents — show reads where available
   const opponents = players.filter((p) => !p.isHero);
@@ -310,23 +364,76 @@ function buildPrompt(hand: PokerHand, reads: PlayerRead[]): string {
 
   if (board.length) lines.push(`Final board: ${board.join(" ")}`);
 
-  // Street-by-street action log with pre-computed draw facts
+  // Street-by-street action log with pre-computed draw facts and pot tracking.
+  // `amount` on HandAction is always the player's CUMULATIVE total contribution
+  // for that street (not an incremental bet/call size). We track per-player
+  // running totals so we can show incremental call amounts and inject the pot
+  // size at each street header.
   const boardSoFar: string[] = [];
+  let runningPot = 0;
+
   for (const street of streets) {
     boardSoFar.push(...street.communityCards);
     const label = street.street.toUpperCase();
     const cc = street.communityCards.length
       ? ` [${street.communityCards.join(" ")}]`
       : "";
-    const actionStr = street.actions
-      .map((a) => {
-        const p = seatMap.get(a.seat);
-        if (!p) return "";
-        return formatAction(a, p.isHero ? "Hero" : p.name, positionName(a.seat, ts));
-      })
-      .filter(Boolean)
-      .join("; ");
-    lines.push(`${label}${cc}: ${actionStr}`);
+
+    const potBeforeStreet = runningPot;
+    // Per-player cumulative contributions on this street (reset each street)
+    const streetContrib = new Map<number, number>();
+
+    const actionParts: string[] = [];
+    for (const a of street.actions) {
+      const p = seatMap.get(a.seat);
+      if (!p) continue;
+      const who = p.isHero ? "Hero" : p.name;
+      const pos = positionName(a.seat, ts);
+      const whoStr = `${who}(${pos})`;
+
+      let actionStr: string;
+      if (a.amount != null && a.amount > 0) {
+        const prevContrib = streetContrib.get(a.seat) ?? 0;
+        const increment = Math.max(0, a.amount - prevContrib);
+        streetContrib.set(a.seat, a.amount);
+        runningPot += increment;
+
+        switch (a.type) {
+          case "call":
+            // Show incremental amount: "BB calls 6" not "BB calls 8" when BB already posted 2
+            actionStr = `${whoStr} calls ${increment}`;
+            break;
+          case "raise":
+            // Show total raise size (standard convention: "raises to X")
+            actionStr = a.openingBet
+              ? `${whoStr} bets ${a.amount}`
+              : `${whoStr} raises to ${a.amount}${a.allIn ? " (all-in)" : ""}`;
+            break;
+          case "allIn":
+            actionStr = `${whoStr} all-in for ${a.amount}`;
+            break;
+          case "post":
+            actionStr = `${whoStr} posts ${a.amount}`;
+            break;
+          case "postStraddle":
+            actionStr = `${whoStr} straddles ${a.amount}`;
+            break;
+          default:
+            actionStr = `${whoStr} ${a.type} ${a.amount}`;
+        }
+      } else {
+        switch (a.type) {
+          case "fold": actionStr = `${whoStr} folds`; break;
+          case "check": actionStr = `${whoStr} checks`; break;
+          default: actionStr = `${whoStr} ${a.type}`; break;
+        }
+      }
+      actionParts.push(actionStr);
+    }
+
+    const potLabel = potBeforeStreet > 0 ? ` (pot: ${potBeforeStreet})` : "";
+    lines.push(`${label}${cc}${potLabel}: ${actionParts.join("; ")}`);
+
     if (hero?.holeCards?.length === 2 && boardSoFar.length > 0) {
       lines.push(computeDrawSummary(hero.holeCards, boardSoFar));
     }
@@ -358,6 +465,11 @@ COACHING PRINCIPLES:
 - When a read exists: always name the player and tag ("Justin is tagged Calling Station — bluffing river is -EV, valuebet thin instead").
 - When no read exists: state you are using GTO population defaults.
 - keyMistake must be the single highest-impact error in the hand, written in 1-2 sentences. If the hand was played well, set keyMistake to null.
+
+TOURNAMENT COACHING (applies when tournament stage is provided):
+5. ICM AWARENESS: When tournament stage is "bubble", "ft_bubble", or "final_table", ICM pressure fundamentally changes correct play. Calling off a big stack near the bubble is often a mistake even with strong equity. Pushing ranges tighten; calling ranges tighten more. State ICM implications explicitly.
+6. STACK DEPTH IN BBs: Always frame decisions in terms of effective BBs, not chip counts. Push/fold charts apply sub-15bb. Shove/call ranges apply sub-25bb. Deep-stack play applies 50bb+.
+7. TOURNAMENT-SPECIFIC ERRORS: Common leaks include: (a) calling off too wide near bubble, (b) not exploiting short stacks' ICM pain, (c) min-raising with a short stack when shoving is correct, (d) passing up chip equity for survival when chip equity is correct.
 
 ACCURACY RULES:
 1. CARD ACCURACY: Reproduce hole cards and board cards exactly as given. Never alter rank or suit.

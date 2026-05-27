@@ -338,15 +338,24 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                     sessions: sorted, displayCurrency: displayCurrency),
                 const SizedBox(height: 20),
 
-                _sectionHeader(context, "What's Affecting Your Win Rate"),
+                // Section header changes based on the primary game type in view.
+                _sectionHeader(
+                  context,
+                  (showingTournaments && !showingCash)
+                      ? "What's Affecting Your ROI"
+                      : "What's Affecting Your Win Rate",
+                ),
                 Text(
-                  'hrs  ·  $sym/hr  ·  P&L',
+                  (showingTournaments && !showingCash)
+                      ? 'entries  ·  ROI  ·  P&L'
+                      : 'hrs  ·  $sym/hr  ·  P&L',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.outline,
                       ),
                 ),
                 const SizedBox(height: 8),
 
+                // ── Cash-only insight cards ──────────────────────────────────
                 if (showingCash) ...[
                   _InsightCard(
                     title: 'By Stakes',
@@ -358,6 +367,8 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                   ),
                   const SizedBox(height: 8),
                 ],
+
+                // ── Tournament insight cards ─────────────────────────────────
                 if (showingTournaments) ...[
                   _InsightCard(
                     title: 'By Buy-in Level',
@@ -373,9 +384,38 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                       '> \$500'
                     ],
                     displayCurrency: displayCurrency,
+                    isTournament: true,
                   ),
                   const SizedBox(height: 8),
+                  // Field size — only shown when enough sessions have entrant counts
+                  if (filtered
+                          .where((s) =>
+                              isTournamentType(s.gameType) &&
+                              (s.totalEntrants ?? 0) > 0)
+                          .length >=
+                      2) ...[
+                    _InsightCard(
+                      title: 'By Field Size',
+                      sessions: filtered
+                          .where((s) =>
+                              isTournamentType(s.gameType) &&
+                              (s.totalEntrants ?? 0) > 0)
+                          .toList(),
+                      keyFn: (s) => fieldSizeBucket(s.totalEntrants),
+                      orderedKeys: const [
+                        'Small (<50)',
+                        'Medium (50–200)',
+                        'Large (200–500)',
+                        'Massive (500+)',
+                      ],
+                      displayCurrency: displayCurrency,
+                      isTournament: true,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                 ],
+
+                // ── Mixed game-type card (shown when both are in view) ───────
                 if (_gameFilter == null &&
                     showingCash &&
                     showingTournaments) ...[
@@ -387,6 +427,8 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                   ),
                   const SizedBox(height: 8),
                 ],
+
+                // ── Shared insight cards ─────────────────────────────────────
                 _InsightCard(
                   title: 'By Day of Week',
                   sessions: filtered,
@@ -395,29 +437,44 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                     'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
                   ],
                   displayCurrency: displayCurrency,
+                  isTournament: showingTournaments && !showingCash,
                 ),
                 const SizedBox(height: 8),
-                _InsightCard(
-                  title: 'By Time of Day',
-                  sessions: filtered,
-                  keyFn: (s) => timeOfDayBucket(s.startTime),
-                  displayCurrency: displayCurrency,
-                ),
-                const SizedBox(height: 8),
-                _InsightCard(
-                  title: 'By Session Length',
-                  sessions: filtered,
-                  keyFn: (s) => sessionLengthBucket(s.durationMinutes),
-                  orderedKeys: const [
-                    '< 2 hours', '2–4 hours', '4–6 hours', '> 6 hours'
-                  ],
-                  displayCurrency: displayCurrency,
-                ),
+
+                // Time of Day — cash or mixed only; less actionable for tournaments
+                if (showingCash) ...[
+                  _InsightCard(
+                    title: 'By Time of Day',
+                    sessions: filtered
+                        .where((s) => s.gameType == 'cash')
+                        .toList(),
+                    keyFn: (s) => timeOfDayBucket(s.startTime),
+                    displayCurrency: displayCurrency,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // Session Length — cash only (for tournaments duration = finish depth, not actionable input)
+                if (showingCash) ...[
+                  _InsightCard(
+                    title: 'By Session Length',
+                    sessions: filtered
+                        .where((s) => s.gameType == 'cash')
+                        .toList(),
+                    keyFn: (s) => sessionLengthBucket(s.durationMinutes),
+                    orderedKeys: const [
+                      '< 2 hours', '2–4 hours', '4–6 hours', '> 6 hours'
+                    ],
+                    displayCurrency: displayCurrency,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // Table Quality — cash only
                 if (showingCash &&
                     filtered.any((s) =>
                         s.tableQuality != null &&
                         s.gameType == 'cash')) ...[
-                  const SizedBox(height: 8),
                   _InsightCard(
                     title: 'By Table Quality',
                     sessions: filtered
@@ -431,9 +488,10 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                         5, (i) => '${i + 1}★ ${tableQualityLabel(i + 1)}'),
                     displayCurrency: displayCurrency,
                   ),
-                ],
-                if (_hasMultipleLocations(filtered)) ...[
                   const SizedBox(height: 8),
+                ],
+
+                if (_hasMultipleLocations(filtered)) ...[
                   _InsightCard(
                     title: 'By Location',
                     sessions: filtered
@@ -441,10 +499,11 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                         .toList(),
                     keyFn: (s) => s.location!,
                     displayCurrency: displayCurrency,
+                    isTournament: showingTournaments && !showingCash,
                   ),
+                  const SizedBox(height: 8),
                 ],
                 if (hasLiveInView && hasOnlineInView) ...[
-                  const SizedBox(height: 8),
                   _InsightCard(
                     title: 'Live vs Online',
                     sessions: filtered,
@@ -452,6 +511,7 @@ class _AnalyticsBodyState extends State<_AnalyticsBody> {
                         isOnlineSession(s.location) ? 'Online' : 'Live',
                     orderedKeys: const ['Live', 'Online'],
                     displayCurrency: displayCurrency,
+                    isTournament: showingTournaments && !showingCash,
                   ),
                 ],
               ],
@@ -1091,13 +1151,17 @@ class _GroupStats {
   final int count;
   final double hourlyRate;
   final double totalHours;
+  final double totalBuyIn;
 
   _GroupStats({
     required this.totalPL,
     required this.count,
     required this.hourlyRate,
     required this.totalHours,
+    required this.totalBuyIn,
   });
+
+  double get roi => totalBuyIn > 0 ? totalPL / totalBuyIn * 100 : 0;
 
   factory _GroupStats.from(List<SessionModel> sessions, String displayCurrency) {
     double toD(double amount, String from) =>
@@ -1105,11 +1169,14 @@ class _GroupStats {
     final total =
         sessions.fold(0.0, (sum, s) => sum + toD(s.profitLoss, s.currency));
     final hours = sessions.fold(0, (s, e) => s + e.durationMinutes) / 60.0;
+    final buyIn =
+        sessions.fold(0.0, (sum, s) => sum + toD(s.buyIn, s.currency));
     return _GroupStats(
       totalPL: total,
       count: sessions.length,
       hourlyRate: hours > 0 ? total / hours : 0,
       totalHours: hours,
+      totalBuyIn: buyIn,
     );
   }
 }
@@ -1120,6 +1187,7 @@ class _InsightCard extends StatelessWidget {
   final String Function(SessionModel) keyFn;
   final List<String>? orderedKeys;
   final String displayCurrency;
+  final bool isTournament;
 
   const _InsightCard({
     required this.title,
@@ -1127,20 +1195,22 @@ class _InsightCard extends StatelessWidget {
     required this.keyFn,
     required this.displayCurrency,
     this.orderedKeys,
+    this.isTournament = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final groups = <String, List<SessionModel>>{};
     for (final s in sessions) {
-      groups.putIfAbsent(keyFn(s), () => []).add(s);
+      final k = keyFn(s);
+      if (k.isEmpty) continue;
+      groups.putIfAbsent(k, () => []).add(s);
     }
     if (groups.length < 2) return const SizedBox.shrink();
 
     final stats =
         groups.map((k, v) => MapEntry(k, _GroupStats.from(v, displayCurrency)));
 
-    // Collect all keys that have data, then sort highest→lowest win rate.
     List<String> keys;
     if (orderedKeys != null) {
       keys = orderedKeys!.where((k) => stats.containsKey(k)).toList();
@@ -1150,11 +1220,18 @@ class _InsightCard extends StatelessWidget {
     } else {
       keys = stats.keys.toList();
     }
-    keys.sort((a, b) => stats[b]!.hourlyRate.compareTo(stats[a]!.hourlyRate));
 
-    final maxAbsHourly = stats.values
-        .map((s) => s.hourlyRate.abs())
-        .reduce((a, b) => a > b ? a : b);
+    if (isTournament) {
+      keys.sort((a, b) => stats[b]!.roi.compareTo(stats[a]!.roi));
+    } else {
+      keys.sort((a, b) => stats[b]!.hourlyRate.compareTo(stats[a]!.hourlyRate));
+    }
+
+    final maxAbsValue = isTournament
+        ? stats.values.map((s) => s.roi.abs()).reduce((a, b) => a > b ? a : b)
+        : stats.values
+            .map((s) => s.hourlyRate.abs())
+            .reduce((a, b) => a > b ? a : b);
 
     return Card(
       child: Padding(
@@ -1172,8 +1249,9 @@ class _InsightCard extends StatelessWidget {
               _InsightRow(
                 label: key,
                 stats: stats[key]!,
-                maxAbsHourly: maxAbsHourly,
+                maxAbsValue: maxAbsValue,
                 displayCurrency: displayCurrency,
+                isTournament: isTournament,
               ),
               const SizedBox(height: 8),
             ],
@@ -1187,21 +1265,24 @@ class _InsightCard extends StatelessWidget {
 class _InsightRow extends StatelessWidget {
   final String label;
   final _GroupStats stats;
-  final double maxAbsHourly;
+  final double maxAbsValue;
   final String displayCurrency;
+  final bool isTournament;
 
   const _InsightRow({
     required this.label,
     required this.stats,
-    required this.maxAbsHourly,
+    required this.maxAbsValue,
     required this.displayCurrency,
+    this.isTournament = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final barColor = stats.hourlyRate >= 0 ? Colors.green : Colors.red;
-    final barFraction = maxAbsHourly > 0
-        ? (stats.hourlyRate.abs() / maxAbsHourly).clamp(0.0, 1.0)
+    final primaryValue = isTournament ? stats.roi : stats.hourlyRate;
+    final barColor = primaryValue >= 0 ? Colors.green : Colors.red;
+    final barFraction = maxAbsValue > 0
+        ? (primaryValue.abs() / maxAbsValue).clamp(0.0, 1.0)
         : 0.0;
 
     return Column(
@@ -1215,13 +1296,21 @@ class _InsightRow extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                   overflow: TextOverflow.ellipsis),
             ),
-            Text('${stats.totalHours.toStringAsFixed(1)}h',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    )),
+            if (isTournament)
+              Text('${stats.count}×',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ))
+            else
+              Text('${stats.totalHours.toStringAsFixed(1)}h',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      )),
             const SizedBox(width: 8),
             Text(
-              '${formatPLWithCurrency(stats.hourlyRate, displayCurrency)}/hr',
+              isTournament
+                  ? formatROI(stats.roi)
+                  : '${formatPLWithCurrency(stats.hourlyRate, displayCurrency)}/hr',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: barColor,
                     fontWeight: FontWeight.bold,
@@ -1242,7 +1331,7 @@ class _InsightRow extends StatelessWidget {
           builder: (_, constraints) {
             final totalWidth = constraints.maxWidth;
             final halfWidth = totalWidth / 2;
-            final isPositive = stats.hourlyRate >= 0;
+            final isPositive = primaryValue >= 0;
             final barWidth = (halfWidth * barFraction).clamp(0.0, halfWidth);
             return Stack(
               children: [
@@ -1365,10 +1454,25 @@ class _RecommendationsCard extends StatelessWidget {
     );
   }
 
-  double _sessionRate(SessionModel s) {
+  bool get _isTournament => typeLabel == 'tournament';
+
+  double _score(SessionModel s) {
+    if (_isTournament) {
+      return s.buyIn > 0 ? s.profitLoss / s.buyIn * 100 : 0;
+    }
     final hours = s.durationMinutes / 60.0;
     if (hours <= 0) return 0;
     return convertCurrency(s.profitLoss, s.currency, displayCurrency) / hours;
+  }
+
+  double _overallScore() {
+    if (_isTournament) {
+      final totalBuyIn = sessions.fold(0.0, (sum, s) => sum + s.buyIn);
+      final totalPL = sessions.fold(0.0, (sum, s) => sum + s.profitLoss);
+      return totalBuyIn > 0 ? totalPL / totalBuyIn * 100 : 0;
+    }
+    final rates = sessions.map(_score).toList();
+    return rates.reduce((a, b) => a + b) / rates.length;
   }
 
   double _welchT(List<double> a, List<double> b) {
@@ -1389,10 +1493,28 @@ class _RecommendationsCard extends StatelessWidget {
   }
 
   String _actionTitle(
-      String dimension, String bestKey, String worstKey, double bestRate) {
+      String dimension, String bestKey, String worstKey, double bestScore) {
+    if (_isTournament) {
+      switch (dimension) {
+        case 'buy-in level':
+          return 'Target $bestKey tournaments';
+        case 'field size':
+          return 'Focus on $bestKey fields';
+        case 'day':
+          return 'Prioritise $bestKey tournaments';
+        case 'location':
+          return '$bestKey is your strongest venue';
+        case 'live/online':
+          return bestScore > 0
+              ? '${bestKey} poker is your stronger format'
+              : 'Shift focus to ${worstKey == bestKey ? 'the other format' : worstKey}';
+        default:
+          return 'Favour $bestKey over $worstKey';
+      }
+    }
     switch (dimension) {
       case 'time slot':
-        return bestRate > 0
+        return bestScore > 0
             ? 'Schedule more sessions in the $bestKey'
             : 'Shift sessions away from $worstKey';
       case 'day':
@@ -1410,25 +1532,42 @@ class _RecommendationsCard extends StatelessWidget {
     }
   }
 
+  String _explanation(
+      String dimension, String bestKey, String worstKey, double bestScore,
+      double worstScore, double overallScore) {
+    if (_isTournament) {
+      final bestFmt = formatROI(bestScore);
+      final worstFmt = formatROI(worstScore);
+      final overallFmt = formatROI(overallScore);
+      final diff = bestScore - worstScore;
+      final diffFmt = formatROI(diff);
+      return '$bestFmt ROI in $bestKey'
+          '${diff > 0 ? ' — ${diffFmt} better than $worstKey ($worstFmt)' : ''}.'
+          ' Your overall ROI is $overallFmt.';
+    }
+    final bestFmt = formatPLWithCurrency(bestScore, displayCurrency);
+    final worstFmt = formatPLWithCurrency(worstScore, displayCurrency);
+    final overallFmt = formatPLWithCurrency(overallScore, displayCurrency);
+    final diff = bestScore - worstScore;
+    final diffFmt = formatPLWithCurrency(diff, displayCurrency);
+    return '$bestFmt/hr in $bestKey sessions'
+        '${diff > 0 ? ' — $diffFmt/hr more than $worstKey ($worstFmt/hr)' : ''}.'
+        ' Your overall rate is $overallFmt/hr.';
+  }
+
   List<_Rec> _buildRecommendations() {
     final recs = <_Rec>[];
-    final overallRates = sessions.map(_sessionRate).toList();
-    final overallMean =
-        overallRates.reduce((a, b) => a + b) / overallRates.length;
+    final overallScore = _overallScore();
 
     void checkFactor({
       required String? Function(SessionModel) keyFn,
       required IconData icon,
       required String dimension,
-      bool cashOnly = false,
     }) {
-      final src = cashOnly
-          ? sessions.where((s) => s.gameType == 'cash').toList()
-          : sessions;
-      if (src.length < 4) return;
+      if (sessions.length < 4) return;
 
       final grouped = <String, List<SessionModel>>{};
-      for (final s in src) {
+      for (final s in sessions) {
         final k = keyFn(s);
         if (k == null || k.isEmpty) continue;
         grouped.putIfAbsent(k, () => []).add(s);
@@ -1437,11 +1576,11 @@ class _RecommendationsCard extends StatelessWidget {
       final qualified = grouped.entries
           .where((e) => e.value.length >= 2)
           .map((e) {
-            final rates = e.value.map(_sessionRate).toList();
+            final scores = e.value.map(_score).toList();
             return (
               key: e.key,
-              rates: rates,
-              mean: rates.reduce((a, b) => a + b) / rates.length,
+              scores: scores,
+              mean: scores.reduce((a, b) => a + b) / scores.length,
             );
           })
           .toList()
@@ -1452,7 +1591,7 @@ class _RecommendationsCard extends StatelessWidget {
       final best = qualified.first;
       final worst = qualified.last;
 
-      final restSessions = src
+      final restSessions = sessions
           .where((s) {
             final k = keyFn(s);
             return k != null && k != best.key;
@@ -1460,58 +1599,72 @@ class _RecommendationsCard extends StatelessWidget {
           .toList();
       if (restSessions.length < 2) return;
 
-      final restRates = restSessions.map(_sessionRate).toList();
-      final tStat = _welchT(best.rates, restRates);
+      final restScores = restSessions.map(_score).toList();
+      final tStat = _welchT(best.scores, restScores);
       if (tStat < 1.8) return;
-
-      final bestFmt = formatPLWithCurrency(best.mean, displayCurrency);
-      final worstFmt = formatPLWithCurrency(worst.mean, displayCurrency);
-      final overallFmt = formatPLWithCurrency(overallMean, displayCurrency);
-      final diff = best.mean - worst.mean;
-      final diffFmt = formatPLWithCurrency(diff, displayCurrency);
 
       recs.add(_Rec(
         icon: icon,
         title: _actionTitle(dimension, best.key, worst.key, best.mean),
-        explanation: '$bestFmt/hr in ${best.key} sessions'
-            '${diff > 0 ? ' — $diffFmt/hr more than ${worst.key} ($worstFmt/hr)' : ''}.'
-            ' Your overall rate is $overallFmt/hr.',
+        explanation: _explanation(
+            dimension, best.key, worst.key, best.mean, worst.mean, overallScore),
         tStat: tStat,
       ));
     }
 
-    checkFactor(
-      keyFn: (s) => _shortTime(timeOfDayBucket(s.startTime)),
-      icon: Icons.access_time,
-      dimension: 'time slot',
-    );
-    checkFactor(
-      keyFn: (s) => dayOfWeekLabel(s.date),
-      icon: Icons.calendar_today,
-      dimension: 'day',
-    );
-    checkFactor(
-      keyFn: (s) => sessionLengthBucket(s.durationMinutes),
-      icon: Icons.timer_outlined,
-      dimension: 'session length',
-    );
-    checkFactor(
-      keyFn: (s) => s.tableQuality != null ? '${s.tableQuality}★' : null,
-      icon: Icons.star_border,
-      dimension: 'table quality',
-      cashOnly: true,
-    );
-    checkFactor(
-      keyFn: (s) => s.location?.isNotEmpty == true ? s.location : null,
-      icon: Icons.location_on_outlined,
-      dimension: 'location',
-    );
-    if (sessions.any((s) => s.gameType == 'cash') &&
-        sessions.any((s) => isTournamentType(s.gameType))) {
+    if (_isTournament) {
+      // Tournament factors — scored by ROI
       checkFactor(
-        keyFn: (s) => gameTypeLabel(s.gameType),
-        icon: Icons.casino_outlined,
-        dimension: 'game type',
+        keyFn: (s) => tournamentBuyInBucket(s.buyIn),
+        icon: Icons.attach_money,
+        dimension: 'buy-in level',
+      );
+      checkFactor(
+        keyFn: (s) => fieldSizeBucket(s.totalEntrants),
+        icon: Icons.people_outline,
+        dimension: 'field size',
+      );
+      checkFactor(
+        keyFn: (s) => dayOfWeekLabel(s.date),
+        icon: Icons.calendar_today,
+        dimension: 'day',
+      );
+      checkFactor(
+        keyFn: (s) => s.location?.isNotEmpty == true ? s.location : null,
+        icon: Icons.location_on_outlined,
+        dimension: 'location',
+      );
+      checkFactor(
+        keyFn: (s) => isOnlineSession(s.location) ? 'Online' : 'Live',
+        icon: Icons.wifi_outlined,
+        dimension: 'live/online',
+      );
+    } else {
+      // Cash factors — scored by hourly rate
+      checkFactor(
+        keyFn: (s) => _shortTime(timeOfDayBucket(s.startTime)),
+        icon: Icons.access_time,
+        dimension: 'time slot',
+      );
+      checkFactor(
+        keyFn: (s) => dayOfWeekLabel(s.date),
+        icon: Icons.calendar_today,
+        dimension: 'day',
+      );
+      checkFactor(
+        keyFn: (s) => sessionLengthBucket(s.durationMinutes),
+        icon: Icons.timer_outlined,
+        dimension: 'session length',
+      );
+      checkFactor(
+        keyFn: (s) => s.tableQuality != null ? '${s.tableQuality}★' : null,
+        icon: Icons.star_border,
+        dimension: 'table quality',
+      );
+      checkFactor(
+        keyFn: (s) => s.location?.isNotEmpty == true ? s.location : null,
+        icon: Icons.location_on_outlined,
+        dimension: 'location',
       );
     }
 

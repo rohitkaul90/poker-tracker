@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/session_model.dart';
 import '../models/session_filter.dart';
 import '../models/hand_model.dart';
+import '../models/tournament_listing.dart';
 import '../services/supabase_service.dart';
 import '../services/hand_service.dart';
 import '../services/ai_service.dart';
@@ -57,3 +58,7 @@ final handsProvider = FutureProvider<List<PokerHand>>((ref) {
 });
 
 final aiServiceProvider = Provider<AiService>((ref) => AiService());
+
+final tournamentListingsProvider = FutureProvider.autoDispose<List<TournamentListing>>((ref) {
+  return ref.read(supabaseServiceProvider).fetchTournamentListings();
+});

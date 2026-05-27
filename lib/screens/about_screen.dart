@@ -39,7 +39,8 @@ class AboutScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 _Prose(
-                  "Poker is a game of information. TableLab makes sure you have yours.",
+                  "Most players keep results in their head.\n"
+                  "The best players keep them in a database.",
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: onSurface,
@@ -47,47 +48,81 @@ class AboutScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _Prose(
-                  "Every session you log is a data point. Enough data points and patterns "
-                  "emerge — maybe your best game is Live \$2/\$5 on Saturday nights, maybe "
-                  "your worst is any online session after midnight. TableLab surfaces those "
-                  "patterns so you can stop guessing and start winning.",
+                  "Poker rewards pattern recognition — and TableLab is built to surface yours. "
+                  "Maybe your best game is live \$2/\$5 on Saturday nights. Maybe you leak chips "
+                  "in every online session past midnight. Maybe you haven't noticed yet. "
+                  "TableLab notices.",
                 ),
                 const SizedBox(height: 28),
                 _FeatureTile(
                   icon: Icons.receipt_long_outlined,
                   color: Colors.teal,
                   title: 'Session Tracker',
-                  body: 'Log every cash game and tournament — buy-ins, rake, duration, location, table quality, and more. Your history, always at hand.',
+                  body: 'Log every cash game and tournament — buy-ins, rake, duration, location, '
+                      'table quality, and more. Your history, always at hand, never in a spreadsheet '
+                      'named "poker stuff v3 FINAL.xlsx".',
                 ),
                 _FeatureTile(
                   icon: Icons.bar_chart_rounded,
                   color: Colors.indigo,
                   title: 'Deep Analytics',
-                  body: 'P&L over time, win rates by stakes, location, game type, time of day, session length — the metrics that actually matter.',
+                  body: 'P&L over time, win rates by stakes, location, game type, day of week, '
+                      'and time of day. Statistical recommendations that flag where you\'re actually '
+                      'making money — not where you think you are.',
                 ),
                 _FeatureTile(
                   icon: Icons.play_circle_outline_rounded,
                   color: Colors.orange,
                   title: 'Hand Replayer',
-                  body: 'Record hands from memory and replay them frame-by-frame. Study your decisions, share lines with friends, and plug the leaks.',
+                  body: 'Record hands from memory and replay them frame-by-frame on a full table view. '
+                      'Cash and tournament hands both supported — enter any blind level, from 100/200 '
+                      'to 5M/10M. Study, share, and plug the leaks.',
+                ),
+                _FeatureTile(
+                  icon: Icons.auto_awesome_outlined,
+                  color: Colors.amber,
+                  title: 'AI Coaching',
+                  body: 'Get a coaching breakdown of any recorded hand or session. '
+                      'The AI reviews your lines, flags sizing mistakes, and gives you something '
+                      'to think about before your next session. Like a coach, but available at 2am.',
                 ),
                 _FeatureTile(
                   icon: Icons.psychology_outlined,
                   color: Colors.purple,
                   title: 'Player Reads',
-                  body: 'Build a private database of tells, tendencies, and notes on opponents. The felt has a memory — now so do you.',
+                  body: 'Your private database of tells, tendencies, and opponent notes. '
+                      'The felt has a memory — now so do you. Names autocomplete in the hand recorder '
+                      'so your reads stay connected to the hands they came from.',
+                ),
+                _FeatureTile(
+                  icon: Icons.event_outlined,
+                  color: Colors.cyan,
+                  title: 'Tournament Calendar',
+                  body: 'Upcoming live tournaments worldwide, updated weekly from PokerNews. '
+                      'WSOP, WPT, EPT, and regional series — filter by country and never miss '
+                      'an event worth playing.',
+                ),
+                _FeatureTile(
+                  icon: Icons.calculate_outlined,
+                  color: Colors.green,
+                  title: 'ICM Deal Calculator',
+                  body: 'When the final table bubbles down to a deal, know your number. '
+                      'The ICM calculator uses the Malmuth-Harville model to compute fair deals '
+                      'based on chip counts and remaining prizes — up to 9 players, instantly.',
+                ),
+                _FeatureTile(
+                  icon: Icons.percent,
+                  color: Colors.lightBlue,
+                  title: 'Equity Calculator',
+                  body: 'Hand vs range equity, calculated across all run-outs. '
+                      'Know whether you\'re 60/40 or 40/60 before you make the call.',
                 ),
                 _FeatureTile(
                   icon: Icons.currency_exchange_rounded,
-                  color: Colors.green,
-                  title: 'Multi-Currency Bankroll',
-                  body: 'CAD, USD, GBP, EUR — play anywhere in the world and your bankroll stays accurate across every currency.',
-                ),
-                _FeatureTile(
-                  icon: Icons.import_export_rounded,
                   color: Colors.blueGrey,
-                  title: 'Import & Export',
-                  body: 'Your data, your way. Export to CSV or Excel, import from existing spreadsheets. No lock-in, ever.',
+                  title: 'Multi-Currency Bankroll',
+                  body: 'CAD, USD, GBP, EUR — play anywhere in the world and your bankroll '
+                      'stays accurate across every currency.',
                 ),
                 const SizedBox(height: 28),
                 Container(
@@ -116,9 +151,10 @@ class AboutScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        "A full-stack poker intelligence platform — tracking, analysis, "
-                        "study, and eventually, community — for every player who takes "
-                        "the game seriously. Built by a player, for players.",
+                        "A full-stack poker intelligence platform — tracking, analysis, study tools, "
+                        "real-time coaching, and eventually, community — for every player who takes "
+                        "the game seriously enough to put in the work away from the table. "
+                        "Built by a player, for players.",
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: onSurface.withAlpha(220),
                           height: 1.5,
@@ -129,7 +165,7 @@ class AboutScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 36),
                 Text(
-                  'TableLab v1.0',
+                  'TableLab v1.1',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
                   ),

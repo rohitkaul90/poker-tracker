@@ -19,8 +19,11 @@ class SessionHistoryScreen extends ConsumerWidget {
     final hasFilter = !filter.isEmpty;
 
     return Scaffold(
-      drawer: const AppDrawer(),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
+        ),
         title: const Text('Sessions'),
         actions: [
           IconButton(

@@ -29,8 +29,17 @@ class HelpScreen extends StatelessWidget {
               _SectionHeader('Hand Replayer', Icons.play_circle_outline_rounded, primary),
               ..._hands.map((faq) => _FaqTile(faq)),
 
+              _SectionHeader('AI Analysis', Icons.auto_awesome_outlined, primary),
+              ..._ai.map((faq) => _FaqTile(faq)),
+
               _SectionHeader('Player Reads', Icons.psychology_outlined, primary),
               ..._reads.map((faq) => _FaqTile(faq)),
+
+              _SectionHeader('Tournament Calendar', Icons.event_outlined, primary),
+              ..._calendar.map((faq) => _FaqTile(faq)),
+
+              _SectionHeader('Tools', Icons.calculate_outlined, primary),
+              ..._tools.map((faq) => _FaqTile(faq)),
 
               _SectionHeader('Import & Export', Icons.import_export_rounded, primary),
               ..._importExport.map((faq) => _FaqTile(faq)),
@@ -54,7 +63,8 @@ const _gettingStarted = [
     q: 'What is TableLab?',
     a: 'TableLab is a poker tracking and analysis app for serious players. '
         'Log every session you play, review performance trends, record and replay hands for study, '
-        'and build a personal database of opponent reads — all synced to the cloud across devices.',
+        'build a personal database of opponent reads, and get AI-powered coaching — '
+        'all synced to the cloud across devices.',
   ),
   _Faq(
     q: 'Do I need an account to use the app?',
@@ -63,8 +73,10 @@ const _gettingStarted = [
   ),
   _Faq(
     q: 'How do I navigate the app?',
-    a: 'The bottom navigation bar has five tabs: Dashboard, Sessions, Hands, Equity Calculator, and Reads. '
-        'Tap the menu icon (☰) in the top-left to open the side panel for your profile, settings, help, and more.',
+    a: 'The bottom navigation bar has five tabs: Dashboard, Sessions, Hands, Reads, and Calendar. '
+        'Tap the menu icon (☰) in the top-left of any screen to open the side drawer. '
+        'The drawer contains your profile, Help, About, Data & Privacy, and the Tools section '
+        '(Equity Calculator and ICM Deal Calculator).',
   ),
   _Faq(
     q: 'Is my data private?',
@@ -161,8 +173,17 @@ const _hands = [
   _Faq(
     q: 'How does the Hand Recorder work?',
     a: 'In the Hands tab, tap the + button. First set up the table: add player names, positions, '
-        'stack sizes, and the blind levels. Then step through each street — Pre-flop, Flop, Turn, River — '
-        'recording each player\'s action (fold, call, raise, all-in) and the community cards dealt.',
+        'and stack sizes. For cash games, select your stakes from the preset list. '
+        'For tournament hands, enter the exact small blind and big blind (e.g. 500 / 1,000). '
+        'Then step through each street — Pre-flop, Flop, Turn, River — '
+        'recording each player\'s action and the community cards dealt.',
+  ),
+  _Faq(
+    q: 'How do I record tournament hands?',
+    a: 'When recording a hand, toggle the "Tournament hand" switch in the setup screen. '
+        'Instead of a fixed stakes dropdown, you\'ll get two free-form fields for Small Blind and Big Blind — '
+        'enter any value from 100/200 up to 5M/10M or beyond. '
+        'Thousands formatting is applied automatically as you type.',
   ),
   _Faq(
     q: 'Do I have to record hands in real time?',
@@ -177,14 +198,46 @@ const _hands = [
         'or press Play to auto-advance. Speed can be adjusted with the speed chips.',
   ),
   _Faq(
+    q: 'Can I link a hand to a session?',
+    a: 'Yes. In the Hand Replayer, tap "Link to session" to connect a recorded hand to one of your saved sessions. '
+        'This is useful if you recorded a hand from memory and want to tie it back to the session it came from.',
+  ),
+  _Faq(
     q: 'Can I share a hand?',
-    a: 'Yes — in the Hand Replayer, tap the share icon in the top-right AppBar. '
+    a: 'Yes — in the Hand Replayer, tap the share icon in the top-right. '
         'This exports the hand as a formatted text hand history (street by street, pot sizes included) '
         'which you can share via any messaging or chat app.',
   ),
   _Faq(
     q: 'Can I delete a recorded hand?',
     a: 'Yes. In the Hands list, swipe left on any hand to reveal the delete action.',
+  ),
+];
+
+const _ai = [
+  _Faq(
+    q: 'What is AI Hand Analysis?',
+    a: 'In the Hand Replayer, tap the AI chip to get a full coaching breakdown of a recorded hand. '
+        'The analysis covers pre-flop decisions, post-flop play, sizing tells, and specific spots '
+        'where you may have deviated from optimal lines — with actionable suggestions.',
+  ),
+  _Faq(
+    q: 'What is AI Session Analysis?',
+    a: 'From a session detail view, tap Analyze to get an AI summary of your overall session performance. '
+        'The analysis looks at your logged stats, notes, and context to identify patterns, '
+        'tilt indicators, and areas of focus for your next session.',
+  ),
+  _Faq(
+    q: 'Is there a limit on AI analysis?',
+    a: 'Yes — AI analysis uses a cloud model and has daily usage limits to keep the service fast and fair: '
+        '20 hand analyses and 5 session analyses per day. '
+        'Results are cached, so re-opening the same analysis doesn\'t count against your limit.',
+  ),
+  _Faq(
+    q: 'How accurate is the AI analysis?',
+    a: 'The AI uses a state-of-the-art language model with strong poker fundamentals. '
+        'It reasons well about common spots but can occasionally misjudge niche or highly exploitative lines. '
+        'Treat it as a study partner, not an oracle — it\'s most useful for identifying patterns and blind spots.',
   ),
 ];
 
@@ -212,6 +265,60 @@ const _reads = [
   ),
 ];
 
+const _calendar = [
+  _Faq(
+    q: 'What is the Tournament Calendar?',
+    a: 'The Calendar tab shows upcoming live poker tournaments sourced from PokerNews — '
+        'major series like WSOP, WPT, EPT, and regional events worldwide. '
+        'Each listing shows dates, buy-in, guarantee, venue, and country.',
+  ),
+  _Faq(
+    q: 'How current is the tournament data?',
+    a: 'The calendar refreshes automatically every Monday from PokerNews. '
+        'Pull down on the Calendar screen to force a refresh at any time.',
+  ),
+  _Faq(
+    q: 'Can I filter by country?',
+    a: 'Yes. Tap the country filter chips below the app bar to narrow the list to a specific country. '
+        'Tap "Show past" in the top-right to also display tournaments that have already ended.',
+  ),
+  _Faq(
+    q: 'Can I register or buy in through the app?',
+    a: 'Not directly — TableLab is a tracking and study tool, not a registration platform. '
+        'Each tournament card shows a link to the full PokerNews listing where registration details are available.',
+  ),
+];
+
+const _tools = [
+  _Faq(
+    q: 'What is the Equity Calculator?',
+    a: 'The Equity Calculator (under Tools in the drawer) lets you calculate hand vs. range equity. '
+        'Enter a specific hand and one or more opponent ranges, and it computes each side\'s equity '
+        'across all possible run-outs — useful for understanding how ahead or behind you are in a given spot.',
+  ),
+  _Faq(
+    q: 'What is the ICM Deal Calculator?',
+    a: 'The ICM Deal Calculator (under Tools in the drawer) helps final table players agree on a fair chip-chop deal. '
+        'Enter each player\'s chip count and the remaining prize spots, and it computes two values: '
+        'the ICM deal (which accounts for payout structure and risk of elimination) '
+        'and a straight chip-chop (chips ÷ total chips × prize pool). '
+        'The Diff column shows who gains or loses under each method.',
+  ),
+  _Faq(
+    q: 'What is ICM and why does it differ from chip-chop?',
+    a: 'ICM (Independent Chip Model) treats tournament chips differently from cash. '
+        'A chip stack worth 30% of the chips doesn\'t guarantee 30% of the remaining prize money, '
+        'because the short stack risks busting first and losing all equity in higher places. '
+        'ICM accounts for this risk — short stacks receive proportionally more than their chip % suggests, '
+        'while big stacks receive less. This makes ICM fairer for short stacks.',
+  ),
+  _Faq(
+    q: 'How many players can the ICM calculator handle?',
+    a: 'Up to 9 players and 9 prize places. The algorithm uses memoised recursion (Malmuth-Harville) '
+        'and handles any realistic final table configuration in under a second.',
+  ),
+];
+
 const _importExport = [
   _Faq(
     q: 'How do I export my sessions?',
@@ -236,8 +343,7 @@ const _account = [
   _Faq(
     q: 'How do I reset my password?',
     a: 'On the login screen, tap "Forgot password?" below the password field and enter your email. '
-        'A reset link will be sent to your inbox. You can also trigger a reset from the sidebar menu '
-        'while logged in (tap the menu icon, then Reset Password under Settings).',
+        'A reset link will be sent to your inbox.',
   ),
   _Faq(
     q: 'Where is my data stored?',

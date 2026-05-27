@@ -145,6 +145,7 @@ class TableSetup {
   final int smallBlind;
   final int bigBlind;
   final int? straddle;
+  final int? ante;
 
   const TableSetup({
     required this.numSeats,
@@ -153,6 +154,7 @@ class TableSetup {
     required this.smallBlind,
     required this.bigBlind,
     this.straddle,
+    this.ante,
   });
 
   int get sbSeat => (buttonSeat + 1) % numSeats;
@@ -195,6 +197,7 @@ class TableSetup {
         'smallBlind': smallBlind,
         'bigBlind': bigBlind,
         if (straddle != null) 'straddle': straddle,
+        if (ante != null) 'ante': ante,
       };
 
   factory TableSetup.fromJson(Map<String, dynamic> j) => TableSetup(
@@ -204,6 +207,7 @@ class TableSetup {
         smallBlind: j['smallBlind'] as int,
         bigBlind: j['bigBlind'] as int,
         straddle: j['straddle'] as int?,
+        ante: j['ante'] as int?,
       );
 }
 
@@ -216,6 +220,7 @@ class PokerHand {
   final List<HandPlayer> players;
   final List<StreetData> streets;
   final String? notes;
+  final String? tournamentStage;
 
   const PokerHand({
     required this.id,
@@ -226,6 +231,7 @@ class PokerHand {
     required this.players,
     required this.streets,
     this.notes,
+    this.tournamentStage,
   });
 
   HandPlayer? get hero => players.where((p) => p.isHero).firstOrNull;
@@ -249,6 +255,7 @@ class PokerHand {
         'players': players.map((p) => p.toJson()).toList(),
         'streets': streets.map((s) => s.toJson()).toList(),
         if (notes != null) 'notes': notes,
+        if (tournamentStage != null) 'tournamentStage': tournamentStage,
       };
 
   factory PokerHand.fromJson(Map<String, dynamic> j) => PokerHand(
@@ -265,5 +272,6 @@ class PokerHand {
             .map((s) => StreetData.fromJson(s as Map<String, dynamic>))
             .toList(),
         notes: j['notes'] as String?,
+        tournamentStage: j['tournamentStage'] as String?,
       );
 }

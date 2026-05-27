@@ -69,8 +69,13 @@ class _ReadsScreenState extends ConsumerState<ReadsScreen> {
     final readsAsync = ref.watch(readsProvider);
 
     return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(title: const Text('Player Reads')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text('Player Reads'),
+      ),
       body: Column(
         children: [
           // Search bar

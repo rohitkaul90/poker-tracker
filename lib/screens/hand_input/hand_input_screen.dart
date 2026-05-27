@@ -1,13 +1,32 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/hand_model.dart';
 import '../../providers/providers.dart';
 import '../../providers/reads_provider.dart';
+import '../../utils/helpers.dart';
 import '../../widgets/playing_card_widget.dart';
 import '../../widgets/chip_stack_widget.dart';
 import '../hand_replayer/hand_replayer_screen.dart';
+
+class _BlindFormatter extends TextInputFormatter {
+  static final _fmt = NumberFormat('#,###', 'en_US');
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final stripped = newValue.text.replaceAll(',', '');
+    if (stripped.isEmpty) return newValue.copyWith(text: '');
+    final n = int.tryParse(stripped);
+    if (n == null) return oldValue;
+    final formatted = _fmt.format(n);
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 enum _Step {
   setup,
@@ -23,12 +42,14 @@ class HandInputScreen extends ConsumerStatefulWidget {
   final String? prefilledSessionId;
   final String? prefilledStakes;
   final String? prefilledSessionLabel;
+  final bool isTournamentSession;
 
   const HandInputScreen({
     super.key,
     this.prefilledSessionId,
     this.prefilledStakes,
     this.prefilledSessionLabel,
+    this.isTournamentSession = false,
   });
 
   @override
@@ -61,11 +82,19 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
       : const ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'MP', 'HJ', 'CO'];
 
   int? get _parsedSB {
+    if (_isTournamentHand) {
+      final v = int.tryParse(_tournSbCtrl.text.replaceAll(',', ''));
+      return (v != null && v > 0) ? v : null;
+    }
     final p = _selectedStakes.split('/');
     return p.length >= 2 ? int.tryParse(p[0].trim()) : null;
   }
 
   int? get _parsedBB {
+    if (_isTournamentHand) {
+      final v = int.tryParse(_tournBbCtrl.text.replaceAll(',', ''));
+      return (v != null && v > 0) ? v : null;
+    }
     final p = _selectedStakes.split('/');
     return p.length >= 2 ? int.tryParse(p[1].trim()) : null;
   }
@@ -75,6 +104,9 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     final bb = _parsedBB;
     return sb != null && bb != null && sb > 0 && bb > 0 && sb < bb;
   }
+
+  static final _blindFmt = NumberFormat('#,###', 'en_US');
+  static String _fmtBlind(int v) => _blindFmt.format(v);
 
   // ── hero cards ───────────────────────────────────────────────────────────────
   final List<String> _heroCards = [];
@@ -162,6 +194,24 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     });
   }
 
+  // ── tournament context ───────────────────────────────────────────────────────
+  bool _isTournamentHand = false;
+  final _anteCtrl = TextEditingController();
+  final _tournSbCtrl = TextEditingController();
+  final _tournBbCtrl = TextEditingController();
+  String? _tournamentStage;
+
+  static const _tournamentStages = [
+    (null, 'Not specified'),
+    ('early', 'Early stages (Day 1/2)'),
+    ('middle', 'Middle stages'),
+    ('late', 'Late stages'),
+    ('bubble', 'On the bubble'),
+    ('itm', 'In the money (ITM)'),
+    ('ft_bubble', 'Final table bubble'),
+    ('final_table', 'Final table'),
+  ];
+
   // ── session linking ──────────────────────────────────────────────────────────
   String? _selectedSessionId;
 
@@ -213,6 +263,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
         _presetStakes.contains(widget.prefilledStakes)) {
       _selectedStakes = widget.prefilledStakes!;
     }
+    _isTournamentHand = widget.isTournamentSession;
   }
 
   // ── setup → start ────────────────────────────────────────────────────────────
@@ -229,6 +280,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
       smallBlind: sb,
       bigBlind: bb,
       straddle: str,
+      ante: int.tryParse(_anteCtrl.text.trim()),
     );
 
     _players = List.generate(_numSeats, (i) {
@@ -466,6 +518,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
       players: updatedPlayers,
       streets: _completedStreets,
       sessionId: _selectedSessionId,
+      tournamentStage: _isTournamentHand ? _tournamentStage : null,
     );
     setState(() {
       _savedHand = hand;
@@ -590,47 +643,163 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
         ),
         const SizedBox(height: 20),
 
-        const Text('Stakes',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: _selectedStakes,
-          decoration: const InputDecoration(
-            prefixText: '\$',
-            border: OutlineInputBorder(),
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        // ── Tournament toggle ────────────────────────────────────────────────
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Tournament hand'),
+          subtitle: const Text(
+            'Enables blind level labelling, ante, stage & BB-depth tracking',
+            style: TextStyle(fontSize: 11),
           ),
-          items: _presetStakes
-              .map((s) => DropdownMenuItem(
-                    value: s,
-                    child: Text('\$$s',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ))
-              .toList(),
-          onChanged: (v) => setState(() => _selectedStakes = v!),
+          value: _isTournamentHand,
+          onChanged: (v) => setState(() {
+            _isTournamentHand = v;
+            if (!v) {
+              _anteCtrl.clear();
+              _tournSbCtrl.clear();
+              _tournBbCtrl.clear();
+              _tournamentStage = null;
+            }
+          }),
         ),
+        const SizedBox(height: 16),
+
+        // ── Blind level (Stakes) ────────────────────────────────────────────
+        Text(
+          _isTournamentHand ? 'Blind Level' : 'Stakes',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        if (_isTournamentHand)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _tournSbCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [_BlindFormatter()],
+                  decoration: const InputDecoration(
+                    labelText: 'Small Blind',
+                    hintText: '100',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: Text('/',
+                    style: TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.w300)),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _tournBbCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [_BlindFormatter()],
+                  decoration: const InputDecoration(
+                    labelText: 'Big Blind',
+                    hintText: '200',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          )
+        else
+          DropdownButtonFormField<String>(
+            value: _selectedStakes,
+            decoration: const InputDecoration(
+              prefixText: '\$',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+            items: _presetStakes
+                .map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text('\$$s',
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold)),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() => _selectedStakes = v!),
+          ),
         if (sb != null && bb != null)
           Padding(
             padding: const EdgeInsets.only(top: 5),
             child: Text(
-              'SB \$$sb  ·  BB \$$bb'
-              '${_hasStraddle ? '  ·  Straddle \$${bb * 2}' : ''}'
-              '  ·  Default stack \$${_hasStraddle ? 200 * bb : 100 * bb}',
+              _isTournamentHand
+                  ? 'SB ${_fmtBlind(sb)}  ·  BB ${_fmtBlind(bb)}'
+                    '  ·  Default stack ${_fmtBlind(100 * bb)} chips (100 BBs)'
+                  : 'SB \$$sb  ·  BB \$$bb'
+                    '${_hasStraddle ? '  ·  Straddle \$${bb * 2}' : ''}'
+                    '  ·  Default stack \$${_hasStraddle ? 200 * bb : 100 * bb}',
               style: const TextStyle(color: Colors.white38, fontSize: 11),
             ),
           ),
         const SizedBox(height: 12),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Straddle'),
-          subtitle: bb != null
-              ? Text('Auto \$${bb * 2}  ·  200 BB stacks',
-                  style: const TextStyle(fontSize: 11))
-              : null,
-          value: _hasStraddle,
-          onChanged: (v) => setState(() => _hasStraddle = v),
-        ),
+
+        // ── Ante (tournament only) ───────────────────────────────────────────
+        if (_isTournamentHand) ...[
+          TextField(
+            controller: _anteCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(
+              labelText: 'Ante (optional)',
+              hintText: 'e.g. 500 for BB ante',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Tournament stage ───────────────────────────────────────────────
+          DropdownButtonFormField<String?>(
+            value: _tournamentStage,
+            decoration: const InputDecoration(
+              labelText: 'Tournament Stage (optional)',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+            items: _tournamentStages
+                .map((entry) => DropdownMenuItem<String?>(
+                      value: entry.$1,
+                      child: Text(entry.$2),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() => _tournamentStage = v),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // ── Straddle (cash only) ─────────────────────────────────────────────
+        if (!_isTournamentHand) ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Straddle'),
+            subtitle: bb != null
+                ? Text('Auto \$${bb * 2}  ·  200 BB stacks',
+                    style: const TextStyle(fontSize: 11))
+                : null,
+            value: _hasStraddle,
+            onChanged: (v) => setState(() => _hasStraddle = v),
+          ),
+        ],
         const SizedBox(height: 16),
 
         const Text('Your Position',
@@ -734,19 +903,41 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
               ),
               const SizedBox(width: 6),
               SizedBox(
-                width: 82,
-                child: TextField(
-                  controller: _stackCtrl[i],
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    hintText: 'Stack',
-                    prefixText: '\$',
-                    border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                  ),
+                width: 90,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _stackCtrl[i],
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly
+                      ],
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Stack',
+                        prefixText: _isTournamentHand ? null : '\$',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 8),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    if (_isTournamentHand && bb != null && bb > 0)
+                      Builder(builder: (_) {
+                        final entered = int.tryParse(_stackCtrl[i].text);
+                        final defaultStack = 100 * bb;
+                        final stack = (entered != null && entered > 0)
+                            ? entered
+                            : defaultStack;
+                        final bbs = stack ~/ bb;
+                        return Text(
+                          '$bbs BBs',
+                          style: const TextStyle(
+                              fontSize: 9, color: Colors.white38),
+                        );
+                      }),
+                  ],
                 ),
               ),
             ]),
@@ -1358,6 +1549,9 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
   @override
   void dispose() {
     _raiseCtrl.dispose();
+    _anteCtrl.dispose();
+    _tournSbCtrl.dispose();
+    _tournBbCtrl.dispose();
     for (final c in _nameCtrl) c.dispose();
     for (final f in _nameFocusNodes) f.dispose();
     for (final c in _stackCtrl) c.dispose();

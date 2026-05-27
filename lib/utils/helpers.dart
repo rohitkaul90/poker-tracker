@@ -87,6 +87,14 @@ String tournamentBuyInBucket(double buyIn) {
   return '> \$500';
 }
 
+String fieldSizeBucket(int? totalEntrants) {
+  if (totalEntrants == null || totalEntrants <= 0) return '';
+  if (totalEntrants < 50) return 'Small (<50)';
+  if (totalEntrants < 200) return 'Medium (50–200)';
+  if (totalEntrants < 500) return 'Large (200–500)';
+  return 'Massive (500+)';
+}
+
 bool isTournamentType(String gameType) =>
     gameType == 'tournament' || gameType == 'sit_and_go';
 
