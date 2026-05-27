@@ -535,6 +535,13 @@ serve(async (req: Request) => {
 
     const { hand, reads = [], forceRefresh = false } = body;
 
+    if (!hand?.id) {
+      return new Response(JSON.stringify({ error: "Missing required field: hand" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     // Only pass reads for opponents actually in this hand
     const opponentNames = new Set(
       hand.players.filter((p) => !p.isHero).map((p) => p.name.toLowerCase()),

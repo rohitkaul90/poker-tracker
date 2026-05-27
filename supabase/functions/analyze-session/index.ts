@@ -568,6 +568,13 @@ serve(async (req: Request) => {
 
     const { session, hands = [], reads = [], forceRefresh = false } = body;
 
+    if (!session?.id) {
+      return new Response(JSON.stringify({ error: "Missing required field: session" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     // ── Cache check ──────────────────────────────────────────────────────────
     if (!forceRefresh) {
       const { data: cached } = await supabase

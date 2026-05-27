@@ -44,10 +44,16 @@ class ReadsService {
   }
 
   Future<void> updateRead(String readId, {String? playerLabel, List<String>? tags}) {
+    final uid = _uid;
+    if (uid == null) throw Exception('Not authenticated');
     final updates = <String, dynamic>{'updated_at': DateTime.now().toIso8601String()};
     if (playerLabel != null) updates['player_label'] = playerLabel;
     if (tags != null) updates['tags'] = tags;
-    return withSupabaseRetry(() => _client.from('player_reads').update(updates).eq('id', readId));
+    return withSupabaseRetry(() => _client
+        .from('player_reads')
+        .update(updates)
+        .eq('id', readId)
+        .eq('user_id', uid));
   }
 
   Future<void> updateNote(String noteId, {

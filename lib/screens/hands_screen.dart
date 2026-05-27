@@ -105,6 +105,7 @@ class _HandsScreenState extends ConsumerState<HandsScreen> {
             context,
             MaterialPageRoute(builder: (_) => const HandInputScreen()),
           );
+          if (!mounted) return;
           ref.invalidate(handsProvider);
         },
         tooltip: 'Record hand',

@@ -34,6 +34,7 @@ class _SessionAnalysisScreenState extends ConsumerState<SessionAnalysisScreen> {
     try {
       final reads = ref.read(readsProvider).value ?? [];
       final allHands = await ref.read(handServiceProvider).fetchHands();
+      if (!mounted) return;
       final sessionHands = allHands
           .where((h) => h.sessionId == widget.session.id)
           .toList();

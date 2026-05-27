@@ -131,7 +131,9 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
 
   TimeOfDay _parseTime(String t) {
     final parts = t.split(':');
-    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    final h = int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 0;
+    final m = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+    return TimeOfDay(hour: h.clamp(0, 23), minute: m.clamp(0, 59));
   }
 
   String _formatTime(TimeOfDay t) =>

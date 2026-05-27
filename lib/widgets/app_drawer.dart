@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/profile_provider.dart';
+import '../providers/providers.dart';
+import '../providers/reads_provider.dart';
 import '../screens/profile_screen.dart';
 import '../screens/about_screen.dart';
 import '../screens/data_privacy_screen.dart';
@@ -250,7 +252,7 @@ class AppDrawer extends ConsumerWidget {
                 'Sign Out',
                 style: TextStyle(color: theme.colorScheme.error),
               ),
-              onTap: () => _confirmSignOut(context),
+              onTap: () => _confirmSignOut(context, ref),
             ),
             const SizedBox(height: 8),
           ],
@@ -259,7 +261,7 @@ class AppDrawer extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmSignOut(BuildContext context) async {
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
     Navigator.pop(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -280,6 +282,11 @@ class AppDrawer extends ConsumerWidget {
     );
     if (confirmed == true) {
       await Supabase.instance.client.auth.signOut();
+      ref.invalidate(sessionsProvider);
+      ref.invalidate(handsProvider);
+      ref.invalidate(filterProvider);
+      ref.invalidate(readsProvider);
+      ref.invalidate(profileProvider);
     }
   }
 }

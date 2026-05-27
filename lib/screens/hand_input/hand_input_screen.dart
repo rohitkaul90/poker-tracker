@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/hand_model.dart';
 import '../../providers/providers.dart';
 import '../../providers/reads_provider.dart';
-import '../../utils/helpers.dart';
 import '../../widgets/playing_card_widget.dart';
 import '../../widgets/chip_stack_widget.dart';
 import '../hand_replayer/hand_replayer_screen.dart';
@@ -541,6 +540,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
       sessionId: _selectedSessionId,
       tournamentStage: _isTournamentHand ? _tournamentStage : null,
     );
+    if (!mounted) return;
     setState(() {
       _savedHand = hand;
       _step = _Step.done;
