@@ -62,3 +62,6 @@ final aiServiceProvider = Provider<AiService>((ref) => AiService());
 final tournamentListingsProvider = FutureProvider.autoDispose<List<TournamentListing>>((ref) {
   return ref.read(supabaseServiceProvider).fetchTournamentListings();
 });
+
+// Controls which bottom-nav tab is active — writable from the AppDrawer.
+final mainTabIndexProvider = StateProvider<int>((ref) => 0);

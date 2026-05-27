@@ -108,6 +108,12 @@ class AppDrawer extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // ── Home section ─────────────────────────────────────
+                    _SectionLabel('HOME', theme),
+                    ..._homeItems(context, ref, theme),
+
+                    const Divider(height: 1),
+
                     // ── Profile nav item ─────────────────────────────────
                     ListTile(
                       leading: const Icon(Icons.person_outline),
@@ -126,19 +132,41 @@ class AppDrawer extends ConsumerWidget {
 
                     const Divider(height: 1),
 
-                    // ── App section ──────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                      child: Text(
-                        'APP',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
+                    // ── Tools section ────────────────────────────────────
+                    _SectionLabel('TOOLS', theme),
+                    ListTile(
+                      leading: const Icon(Icons.percent),
+                      title: const Text('Equity Calculator'),
+                      subtitle: const Text('Hand vs range equity',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const EquityCalculatorScreen()),
+                        );
+                      },
                     ),
+                    ListTile(
+                      leading: const Icon(Icons.calculate_outlined),
+                      title: const Text('ICM Deal Calculator'),
+                      subtitle: const Text('Fair chip-chop deals at final tables',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const IcmCalculatorScreen()),
+                        );
+                      },
+                    ),
+
+                    const Divider(height: 1),
+
+                    // ── App section ──────────────────────────────────────
+                    _SectionLabel('APP', theme),
                     ListTile(
                       leading: const Icon(Icons.help_outline_rounded),
                       title: const Text('Help & FAQ'),
@@ -195,50 +223,6 @@ class AppDrawer extends ConsumerWidget {
                         ));
                       },
                     ),
-
-                    const Divider(height: 1),
-
-                    // ── Tools section ────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                      child: Text(
-                        'TOOLS',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.percent),
-                      title: const Text('Equity Calculator'),
-                      subtitle: const Text('Hand vs range equity',
-                          style: TextStyle(fontSize: 11)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const EquityCalculatorScreen()),
-                        );
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.calculate_outlined),
-                      title: const Text('ICM Deal Calculator'),
-                      subtitle: const Text('Fair chip-chop deals at final tables',
-                          style: TextStyle(fontSize: 11)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const IcmCalculatorScreen()),
-                        );
-                      },
-                    ),
                   ],
                 ),
               ),
@@ -259,6 +243,35 @@ class AppDrawer extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _homeItems(BuildContext context, WidgetRef ref, ThemeData theme) {
+    final tabs = [
+      (0, Icons.dashboard_outlined, 'Dashboard'),
+      (1, Icons.list_outlined, 'Sessions'),
+      (2, Icons.style_outlined, 'Hands'),
+      (3, Icons.psychology_outlined, 'Reads'),
+      (4, Icons.event_outlined, 'Calendar'),
+    ];
+    final currentIndex = ref.watch(mainTabIndexProvider);
+    return tabs.map((t) {
+      final (idx, icon, label) = t;
+      final isSelected = currentIndex == idx;
+      return ListTile(
+        leading: Icon(icon,
+            color: isSelected ? theme.colorScheme.primary : null),
+        title: Text(label,
+            style: TextStyle(
+              color: isSelected ? theme.colorScheme.primary : null,
+              fontWeight: isSelected ? FontWeight.bold : null,
+            )),
+        selected: isSelected,
+        onTap: () {
+          ref.read(mainTabIndexProvider.notifier).state = idx;
+          Navigator.popUntil(context, (route) => route.isFirst);
+        },
+      );
+    }).toList();
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
@@ -288,5 +301,28 @@ class AppDrawer extends ConsumerWidget {
       ref.invalidate(readsProvider);
       ref.invalidate(profileProvider);
     }
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final ThemeData theme;
+
+  const _SectionLabel(this.label, this.theme);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
   }
 }

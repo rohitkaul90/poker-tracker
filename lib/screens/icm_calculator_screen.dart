@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import '../widgets/app_drawer.dart';
 
 class _ThousandsFormatter extends TextInputFormatter {
   static final _fmt = NumberFormat('#,###', 'en_US');
@@ -261,6 +262,7 @@ class _IcmCalculatorScreenState extends State<IcmCalculatorScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('ICM Deal Calculator'),
         actions: [
