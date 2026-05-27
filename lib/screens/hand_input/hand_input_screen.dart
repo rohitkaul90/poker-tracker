@@ -250,6 +250,12 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
   int get _currentPot =>
       _pot + _contributions.values.fold(0, (a, b) => a + b);
 
+  // True when ≤1 non-all-in player is still active — cards run out with no action.
+  bool get _isAllInRunout {
+    final nonAllIn = _activeSeats.where((s) => !_allInSeats.contains(s)).length;
+    return nonAllIn <= 1;
+  }
+
   int get _minRaise =>
       _currentBet + max(_setup.bigBlind, _lastRaiseSize);
 
@@ -332,12 +338,15 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     _currentStreet = street;
     _contributions = {};
     _streetActions.clear();
-    _allInSeats.clear();
+    // Do NOT clear _allInSeats — all-in is permanent for the hand duration.
     _raiseMode = false;
     _awaitingDeal = false;
     _currentBet = 0;
     _lastRaiseSize = 0;
-    _toAct = _setup.postflopOrder(_activeSeats);
+    // Exclude all-in players: they have no chips to bet with on this street.
+    _toAct = _setup.postflopOrder(_activeSeats)
+        .where((s) => !_allInSeats.contains(s))
+        .toList();
     setState(() => _step = nextStep);
   }
 
@@ -467,12 +476,24 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
       _riverCard = picked.first;
     }
 
-    final nextStep = nextStreet == Street.flop
-        ? _Step.flopAction
-        : nextStreet == Street.turn
-            ? _Step.turnAction
-            : _Step.riverAction;
-    _initPostflop(nextStreet, nextStep);
+    if (_isAllInRunout) {
+      // All-in runout: record the street with no action, then immediately
+      // move to the next deal (or showdown if river).
+      _currentStreet = nextStreet;
+      _contributions = {};
+      _streetActions.clear();
+      _currentBet = 0;
+      _lastRaiseSize = 0;
+      _awaitingDeal = false;
+      _finalizeStreet();
+    } else {
+      final nextStep = nextStreet == Street.flop
+          ? _Step.flopAction
+          : nextStreet == Street.turn
+              ? _Step.turnAction
+              : _Step.riverAction;
+      _initPostflop(nextStreet, nextStep);
+    }
   }
 
   // ── showdown ─────────────────────────────────────────────────────────────────
@@ -1088,6 +1109,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
                 stack: _runningStacks[p.seatIndex] ?? 0,
                 folded: isFolded,
                 isActing: isActing,
+                isAllIn: _allInSeats.contains(p.seatIndex),
                 heroCards: p.isHero ? _heroCards : null,
               );
 
@@ -1111,6 +1133,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     final numCompleted = _completedStreets.length;
     final streetName =
         numCompleted == 1 ? 'Flop' : numCompleted == 2 ? 'Turn' : 'River';
+    final runout = _isAllInRunout;
 
     return Container(
       decoration: const BoxDecoration(
@@ -1121,31 +1144,56 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
         ],
       ),
       padding: EdgeInsets.fromLTRB(
-          12, 12, 12, 12 + MediaQuery.of(context).padding.bottom),
-      child: Row(children: [
-        Expanded(
-          flex: 3,
-          child: FilledButton.icon(
-            onPressed: _dealNextStreet,
-            icon: const Icon(Icons.style_outlined, size: 18),
-            label: Text('Deal $streetName'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 48),
-              backgroundColor: const Color(0xFF1565C0),
+          12, 10, 12, 10 + MediaQuery.of(context).padding.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (runout) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withAlpha(25),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: Colors.orange.withAlpha(80)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.all_inclusive, size: 13, color: Colors.orange),
+                  SizedBox(width: 6),
+                  Text('All-in — cards run out, no further betting',
+                      style: TextStyle(fontSize: 11, color: Colors.orange)),
+                ],
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: _beginShowdown,
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-            child: const Text('End Hand',
-                style: TextStyle(fontSize: 12),
-                overflow: TextOverflow.ellipsis),
-          ),
-        ),
-      ]),
+          ],
+          Row(children: [
+            Expanded(
+              flex: 3,
+              child: FilledButton.icon(
+                onPressed: _dealNextStreet,
+                icon: const Icon(Icons.style_outlined, size: 18),
+                label: Text('Deal $streetName'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  backgroundColor: const Color(0xFF1565C0),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _beginShowdown,
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: const Text('End Hand',
+                    style: TextStyle(fontSize: 12),
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ]),
+        ],
+      ),
     );
   }
 
@@ -1762,6 +1810,7 @@ class _RecorderPlayerPanel extends StatelessWidget {
   final int stack;
   final bool folded;
   final bool isActing;
+  final bool isAllIn;
   final List<String>? heroCards;
 
   const _RecorderPlayerPanel({
@@ -1770,6 +1819,7 @@ class _RecorderPlayerPanel extends StatelessWidget {
     required this.stack,
     required this.folded,
     required this.isActing,
+    this.isAllIn = false,
     this.heroCards,
   });
 
@@ -1783,16 +1833,18 @@ class _RecorderPlayerPanel extends StatelessWidget {
             : const Color(0xFF1E1E2E);
     final border = isActing
         ? const Color(0xFF66BB6A)
-        : player.isHero
-            ? const Color(0xFF1565C0)
-            : Colors.white12;
+        : isAllIn && !folded
+            ? Colors.orange.withAlpha(180)
+            : player.isHero
+                ? const Color(0xFF1565C0)
+                : Colors.white12;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: border, width: isActing ? 2 : 1),
+        border: Border.all(color: border, width: isActing || (isAllIn && !folded) ? 2 : 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
       child: Column(
@@ -1824,12 +1876,26 @@ class _RecorderPlayerPanel extends StatelessWidget {
             maxLines: 1,
           ),
           if (!folded) ...[
-            Text(
-              stack >= 1000
-                  ? '\$${(stack / 1000).toStringAsFixed(1)}k'
-                  : '\$$stack',
-              style: const TextStyle(fontSize: 8, color: Colors.white54),
-            ),
+            if (isAllIn)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withAlpha(40),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: const Text('ALL IN',
+                    style: TextStyle(
+                        fontSize: 7,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange)),
+              )
+            else
+              Text(
+                stack >= 1000
+                    ? '\$${(stack / 1000).toStringAsFixed(1)}k'
+                    : '\$$stack',
+                style: const TextStyle(fontSize: 8, color: Colors.white54),
+              ),
             const SizedBox(height: 2),
             // Cards row
             if (heroCards != null && heroCards!.isNotEmpty)
