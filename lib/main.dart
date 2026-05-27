@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth/auth_gate.dart';
 import 'config/supabase_config.dart';
-import 'providers/providers.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/hands_screen.dart';
 import 'screens/reads_screen.dart';
@@ -40,17 +39,23 @@ class PokerTrackerApp extends StatelessWidget {
   }
 }
 
-class MainNavigation extends ConsumerWidget {
+class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final currentIndex = ref.watch(mainTabIndexProvider);
+  State<MainNavigation> createState() => _MainNavigationState();
+}
+
+class _MainNavigationState extends State<MainNavigation> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       key: mainScaffoldKey,
       drawer: const AppDrawer(),
       body: IndexedStack(
-        index: currentIndex,
+        index: _currentIndex,
         children: const [
           DashboardScreen(),
           SessionHistoryScreen(),
@@ -60,9 +65,8 @@ class MainNavigation extends ConsumerWidget {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (i) =>
-            ref.read(mainTabIndexProvider.notifier).state = i,
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),

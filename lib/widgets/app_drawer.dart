@@ -108,9 +108,18 @@ class AppDrawer extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── Home section ─────────────────────────────────────
-                    _SectionLabel('HOME', theme),
-                    ..._homeItems(context, ref, theme),
+                    // ── Home ─────────────────────────────────────────────
+                    ListTile(
+                      leading: const Icon(Icons.home_outlined),
+                      title: const Text('Home'),
+                      subtitle: const Text('Dashboard, sessions, hands & more',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst);
+                        mainScaffoldKey.currentState?.closeDrawer();
+                      },
+                    ),
 
                     const Divider(height: 1),
 
@@ -243,35 +252,6 @@ class AppDrawer extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  List<Widget> _homeItems(BuildContext context, WidgetRef ref, ThemeData theme) {
-    final tabs = [
-      (0, Icons.dashboard_outlined, 'Dashboard'),
-      (1, Icons.list_outlined, 'Sessions'),
-      (2, Icons.style_outlined, 'Hands'),
-      (3, Icons.psychology_outlined, 'Reads'),
-      (4, Icons.event_outlined, 'Calendar'),
-    ];
-    final currentIndex = ref.watch(mainTabIndexProvider);
-    return tabs.map((t) {
-      final (idx, icon, label) = t;
-      final isSelected = currentIndex == idx;
-      return ListTile(
-        leading: Icon(icon,
-            color: isSelected ? theme.colorScheme.primary : null),
-        title: Text(label,
-            style: TextStyle(
-              color: isSelected ? theme.colorScheme.primary : null,
-              fontWeight: isSelected ? FontWeight.bold : null,
-            )),
-        selected: isSelected,
-        onTap: () {
-          ref.read(mainTabIndexProvider.notifier).state = idx;
-          Navigator.popUntil(context, (route) => route.isFirst);
-        },
-      );
-    }).toList();
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
