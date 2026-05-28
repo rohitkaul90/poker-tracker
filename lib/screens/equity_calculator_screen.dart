@@ -9,10 +9,14 @@ import '../widgets/equity/range_matrix.dart';
 class _PlayerState {
   String position;
   Set<int> selectedCells;
+  bool isExactHand = false;
+  int? card1;
+  int? card2;
 
   _PlayerState({required this.position, required this.selectedCells});
 
   int get comboCount {
+    if (isExactHand) return (card1 != null && card2 != null) ? 1 : 0;
     int total = 0;
     for (final key in selectedCells) {
       total += cellComboCount(key ~/ 13, key % 13);
@@ -20,9 +24,14 @@ class _PlayerState {
     return total;
   }
 
-  double get rangePercent => comboCount / 1326 * 100;
+  double get rangePercent => isExactHand ? 0 : comboCount / 1326 * 100;
 
   List<List<int>> expandCombos(Set<int> excludeCards) {
+    if (isExactHand) {
+      if (card1 == null || card2 == null) return [];
+      if (excludeCards.contains(card1!) || excludeCards.contains(card2!)) return [];
+      return [[card1!, card2!]];
+    }
     final result = <List<int>>[];
     for (final key in selectedCells) {
       for (final combo in expandCell(key ~/ 13, key % 13, exclude: excludeCards)) {
@@ -59,6 +68,19 @@ class _EquityCalculatorScreenState extends State<EquityCalculatorScreen> {
     _openRangeEditor(_players.length - 1);
   }
 
+  Set<int> _excludedForPlayer(int idx) {
+    final excluded = _board.whereType<int>().toSet();
+    for (int i = 0; i < _players.length; i++) {
+      if (i == idx) continue;
+      final p = _players[i];
+      if (p.isExactHand) {
+        if (p.card1 != null) excluded.add(p.card1!);
+        if (p.card2 != null) excluded.add(p.card2!);
+      }
+    }
+    return excluded;
+  }
+
   void _openRangeEditor(int idx) {
     final p = _players[idx];
     showModalBottomSheet(
@@ -71,9 +93,16 @@ class _EquityCalculatorScreenState extends State<EquityCalculatorScreen> {
         position: p.position,
         selectedCells: p.selectedCells,
         takenPositions: _takenPositions..remove(p.position),
-        onSave: (pos, cells) => setState(() {
+        isExactHand: p.isExactHand,
+        card1: p.card1,
+        card2: p.card2,
+        excludedCards: _excludedForPlayer(idx),
+        onSave: (pos, cells, isExact, c1, c2) => setState(() {
           _players[idx].position = pos;
           _players[idx].selectedCells = cells;
+          _players[idx].isExactHand = isExact;
+          _players[idx].card1 = c1;
+          _players[idx].card2 = c2;
           _result = null;
         }),
         onDelete: _players.length > 2
@@ -369,6 +398,59 @@ class _EquityCalculatorScreenState extends State<EquityCalculatorScreen> {
   ];
 }
 
+// ── Exact hole card display (2 cards side-by-side in the player card) ─────────
+
+class _HoleCardsDisplay extends StatelessWidget {
+  final int card1;
+  final int card2;
+
+  const _HoleCardsDisplay({required this.card1, required this.card2});
+
+  Color _suitColor(int s) {
+    switch (s) {
+      case 0: return Colors.green.shade300;
+      case 1: return Colors.blue.shade300;
+      case 2: return Colors.red.shade400;
+      case 3: return Colors.purple.shade300;
+      default: return Colors.white;
+    }
+  }
+
+  Widget _cardWidget(BuildContext context, int cardIdx) {
+    final theme = Theme.of(context);
+    final c = _suitColor(cardSuit(cardIdx));
+    return Container(
+      width: 36, height: 50,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: c, width: 1.5),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(kRankChars[cardRank(cardIdx)],
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: c)),
+          Text(kSuitSymbols[cardSuit(cardIdx)],
+              style: TextStyle(fontSize: 11, color: c)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _cardWidget(context, card1),
+        const SizedBox(width: 4),
+        _cardWidget(context, card2),
+      ],
+    );
+  }
+}
+
 // ── Player card on main screen ─────────────────────────────────────────────
 
 class _PlayerCard extends StatelessWidget {
@@ -429,14 +511,17 @@ class _PlayerCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             if (hasRange) ...[
-              // Mini 13×13 matrix preview
-              MiniRangeMatrix(selectedCells: player.selectedCells),
-              const SizedBox(height: 4),
-              Text(
-                '${player.comboCount} combos  ${player.rangePercent.toStringAsFixed(1)}%',
-                style: const TextStyle(fontSize: 9, color: Colors.white54),
-                textAlign: TextAlign.center,
-              ),
+              if (player.isExactHand) ...[
+                _HoleCardsDisplay(card1: player.card1!, card2: player.card2!),
+              ] else ...[
+                MiniRangeMatrix(selectedCells: player.selectedCells),
+                const SizedBox(height: 4),
+                Text(
+                  '${player.comboCount} combos  ${player.rangePercent.toStringAsFixed(1)}%',
+                  style: const TextStyle(fontSize: 9, color: Colors.white54),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               if (equity != null) ...[
                 const SizedBox(height: 4),
                 Text(
@@ -450,9 +535,11 @@ class _PlayerCard extends StatelessWidget {
               ],
             ] else ...[
               const Spacer(),
-              const Text('Tap to\nset range',
-                  style: TextStyle(fontSize: 10, color: Colors.white30),
-                  textAlign: TextAlign.center),
+              Text(
+                player.isExactHand ? 'Tap to\nset hand' : 'Tap to\nset range',
+                style: const TextStyle(fontSize: 10, color: Colors.white30),
+                textAlign: TextAlign.center,
+              ),
               const Spacer(),
             ],
           ],
@@ -498,7 +585,7 @@ class _EquityRow extends StatelessWidget {
               Text('${(equity * 100).toStringAsFixed(1)}%',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
               const Spacer(),
-              Text('$comboCount combos',
+              Text('$comboCount ${comboCount == 1 ? 'combo' : 'combos'}',
                   style: const TextStyle(fontSize: 11, color: Colors.white38)),
             ],
           ),

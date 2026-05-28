@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../equity/card.dart';
 import '../../equity/gto_ranges.dart';
+import 'card_picker.dart';
 import 'range_matrix.dart';
 
 const List<String> kPositions = [
@@ -9,8 +11,12 @@ const List<String> kPositions = [
 class PlayerRangeEditor extends StatefulWidget {
   final String position;
   final Set<int> selectedCells;
-  final Set<String> takenPositions; // positions already used by other players
-  final void Function(String position, Set<int> cells) onSave;
+  final Set<String> takenPositions;
+  final bool isExactHand;
+  final int? card1;
+  final int? card2;
+  final Set<int> excludedCards; // board + other players' exact cards
+  final void Function(String position, Set<int> cells, bool isExactHand, int? card1, int? card2) onSave;
   final VoidCallback? onDelete;
 
   const PlayerRangeEditor({
@@ -19,6 +25,10 @@ class PlayerRangeEditor extends StatefulWidget {
     required this.selectedCells,
     required this.takenPositions,
     required this.onSave,
+    this.isExactHand = false,
+    this.card1,
+    this.card2,
+    this.excludedCards = const {},
     this.onDelete,
   });
 
@@ -30,12 +40,18 @@ class _PlayerRangeEditorState extends State<PlayerRangeEditor> {
   late String _position;
   late Set<int> _cells;
   String? _selectedPreset;
+  late bool _isExactHand;
+  int? _card1;
+  int? _card2;
 
   @override
   void initState() {
     super.initState();
     _position = widget.position;
     _cells = Set<int>.from(widget.selectedCells);
+    _isExactHand = widget.isExactHand;
+    _card1 = widget.card1;
+    _card2 = widget.card2;
   }
 
   Map<String, List<GtoPreset>> get _presetsByCategory => gtoPresetsByCategory;
@@ -46,6 +62,28 @@ class _PlayerRangeEditorState extends State<PlayerRangeEditor> {
       _selectedPreset = key;
       _cells = handSetToCells(preset.hands);
     });
+  }
+
+  void _pickCard({required bool isCard1, required BuildContext context}) {
+    final excluded = {
+      ...widget.excludedCards,
+      if (isCard1 && _card2 != null) _card2!,
+      if (!isCard1 && _card1 != null) _card1!,
+    };
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => CardPickerSheet(
+        excludedCards: excluded,
+        currentCard: isCard1 ? _card1 : _card2,
+        onSelected: (idx) => setState(() {
+          if (isCard1) { _card1 = idx; } else { _card2 = idx; }
+        }),
+      ),
+    );
   }
 
   void _clearAll() => setState(() => _cells = {});
@@ -96,7 +134,7 @@ class _PlayerRangeEditorState extends State<PlayerRangeEditor> {
                     ),
                   TextButton(
                     onPressed: () {
-                      widget.onSave(_position, _cells);
+                      widget.onSave(_position, _cells, _isExactHand, _card1, _card2);
                       Navigator.pop(context);
                     },
                     child: const Text('Done'),
@@ -134,81 +172,127 @@ class _PlayerRangeEditorState extends State<PlayerRangeEditor> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // GTO preset selector
-                    const Text('Load GTO Preset:', style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    _DropdownContainer(
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedPreset,
-                          isExpanded: true,
-                          hint: const Text('Select preset...'),
-                          items: [
-                            for (final entry in _presetsByCategory.entries) ...[
-                              DropdownMenuItem<String>(
-                                value: '__header_${entry.key}',
-                                enabled: false,
-                                child: Text(
-                                  entry.key,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                              for (final preset in entry.value)
-                                DropdownMenuItem<String>(
-                                  value: preset.key,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 12),
-                                    child: Text(preset.label),
-                                  ),
-                                ),
-                            ]
+                    // Mode toggle
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: false, label: Text('Range')),
+                        ButtonSegment(value: true, label: Text('Exact Hand')),
+                      ],
+                      selected: {_isExactHand},
+                      onSelectionChanged: (s) => setState(() => _isExactHand = s.first),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_isExactHand) ...[
+                      // Exact hand picker
+                      const Text('Select hole cards:', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _ExactCardSlot(
+                            cardIdx: _card1,
+                            label: 'Card 1',
+                            onTap: () => _pickCard(isCard1: true, context: context),
+                          ),
+                          const SizedBox(width: 16),
+                          _ExactCardSlot(
+                            cardIdx: _card2,
+                            label: 'Card 2',
+                            onTap: () => _pickCard(isCard1: false, context: context),
+                          ),
+                          if (_card1 != null || _card2 != null) ...[
+                            const Spacer(),
+                            TextButton(
+                              onPressed: () => setState(() { _card1 = null; _card2 = null; }),
+                              child: const Text('Clear'),
+                            ),
                           ],
-                          onChanged: (v) {
-                            if (v != null && !v.startsWith('__header_')) _applyPreset(v);
-                          },
+                        ],
+                      ),
+                      if (_card1 != null && _card2 != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          '${cardName(_card1!)} — ${cardName(_card2!)}',
+                          style: const TextStyle(fontSize: 15, color: Colors.white70, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                    ] else ...[
+                      // GTO preset selector
+                      const Text('Load GTO Preset:', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      _DropdownContainer(
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedPreset,
+                            isExpanded: true,
+                            hint: const Text('Select preset...'),
+                            items: [
+                              for (final entry in _presetsByCategory.entries) ...[
+                                DropdownMenuItem<String>(
+                                  value: '__header_${entry.key}',
+                                  enabled: false,
+                                  child: Text(
+                                    entry.key,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.primary,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                for (final preset in entry.value)
+                                  DropdownMenuItem<String>(
+                                    value: preset.key,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(left: 12),
+                                      child: Text(preset.label),
+                                    ),
+                                  ),
+                              ]
+                            ],
+                            onChanged: (v) {
+                              if (v != null && !v.startsWith('__header_')) _applyPreset(v);
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Quick actions
-                    Row(
-                      children: [
-                        TextButton(onPressed: _clearAll, child: const Text('Clear All')),
-                        const SizedBox(width: 8),
-                        TextButton(onPressed: _selectAll, child: const Text('Select All')),
-                        const Spacer(),
-                        RangeStats(selectedCells: _cells),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Legend
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _LegendDot(color: Colors.amber, label: 'Pairs'),
-                        const SizedBox(width: 12),
-                        _LegendDot(color: Colors.green.shade600, label: 'Suited'),
-                        const SizedBox(width: 12),
-                        _LegendDot(color: Colors.blue.shade600, label: 'Offsuit'),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Matrix
-                    RangeMatrix(
-                      selectedCells: _cells,
-                      onChanged: (cells) {
-                        setState(() {
-                          _cells = cells;
-                          _selectedPreset = null; // custom
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 12),
+                      // Quick actions
+                      Row(
+                        children: [
+                          TextButton(onPressed: _clearAll, child: const Text('Clear All')),
+                          const SizedBox(width: 8),
+                          TextButton(onPressed: _selectAll, child: const Text('Select All')),
+                          const Spacer(),
+                          RangeStats(selectedCells: _cells),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Legend
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _LegendDot(color: Colors.amber, label: 'Pairs'),
+                          const SizedBox(width: 12),
+                          _LegendDot(color: Colors.green.shade600, label: 'Suited'),
+                          const SizedBox(width: 12),
+                          _LegendDot(color: Colors.blue.shade600, label: 'Offsuit'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Matrix
+                      RangeMatrix(
+                        selectedCells: _cells,
+                        onChanged: (cells) {
+                          setState(() {
+                            _cells = cells;
+                            _selectedPreset = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ],
                 ),
               ),
@@ -233,6 +317,72 @@ class _DropdownContainer extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: child,
+    );
+  }
+}
+
+class _ExactCardSlot extends StatelessWidget {
+  final int? cardIdx;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ExactCardSlot({this.cardIdx, required this.label, required this.onTap});
+
+  Color _suitColor(int s) {
+    switch (s) {
+      case 0: return Colors.green.shade300;
+      case 1: return Colors.blue.shade300;
+      case 2: return Colors.red.shade400;
+      case 3: return Colors.purple.shade300;
+      default: return Colors.white;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: cardIdx == null
+              ? Container(
+                  width: 68, height: 94,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: theme.colorScheme.primary.withAlpha(180), width: 1.5,
+                        style: BorderStyle.solid),
+                  ),
+                  child: Center(
+                    child: Text('?',
+                        style: TextStyle(fontSize: 36, color: theme.colorScheme.primary.withAlpha(180))),
+                  ),
+                )
+              : Container(
+                  width: 68, height: 94,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _suitColor(cardSuit(cardIdx!)), width: 2),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(kRankChars[cardRank(cardIdx!)],
+                          style: TextStyle(
+                              fontSize: 30, fontWeight: FontWeight.bold,
+                              color: _suitColor(cardSuit(cardIdx!)))),
+                      Text(kSuitSymbols[cardSuit(cardIdx!)],
+                          style: TextStyle(fontSize: 20, color: _suitColor(cardSuit(cardIdx!)))),
+                    ],
+                  ),
+                ),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white54)),
+      ],
     );
   }
 }
