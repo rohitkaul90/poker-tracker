@@ -275,6 +275,8 @@ class AppDrawer extends ConsumerWidget {
     );
     if (confirmed == true) {
       await Supabase.instance.client.auth.signOut();
+      // Widget is disposed by the time AuthGate switches to LoginScreen.
+      if (!context.mounted) return;
       ref.invalidate(sessionsProvider);
       ref.invalidate(handsProvider);
       ref.invalidate(filterProvider);
