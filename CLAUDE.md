@@ -7,21 +7,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Run the app
 flutter run
+flutter run -d emulator-5554     # Android emulator
+flutter run -d windows            # Windows desktop
 
 # Build
 flutter build apk
-flutter build web --base-href /poker-tracker/   # GitHub Pages deployment
+flutter build web --release --base-href "/"   # custom domain (tablelab.app) — PowerShell only
+# IMPORTANT: run the build in PowerShell, not bash; bash on Windows mangles the bare /
+
+# Deploy to GitHub Pages (after web build)
+# Run in bash:
+CNAME=$(cat docs/CNAME) && cp -r build/web/. docs/ && echo "$CNAME" > docs/CNAME && touch docs/.nojekyll
+# Then commit and push docs/
 
 # Dependencies
 flutter pub get
 
-# Static analysis (lint)
+# Static analysis
 flutter analyze
 
 # Tests
 flutter test
 
-# Code generation (Riverpod @riverpod annotations, if added)
+# Regenerate native splash assets (after changing flutter_native_splash config in pubspec.yaml)
+dart run flutter_native_splash:create
+
+# Regenerate launcher icons (after changing flutter_launcher_icons config)
+dart run flutter_launcher_icons
+
+# Code generation (if @riverpod annotations are added)
 dart run build_runner build --delete-conflicting-outputs
 ```
 
@@ -29,69 +43,96 @@ dart run build_runner build --delete-conflicting-outputs
 
 **TableLab** is a Flutter poker bankroll tracker. Package name: `tablelab`. Dark Material 3 theme, seed color `#1B5E20`.
 
-### State management — Riverpod
-
-All providers live in `lib/providers/`. Pattern: service classes are plain Dart (no Riverpod), wrapped in `Provider<>` at the provider layer.
-
-- `providers.dart` — sessions, filter, hands, AI service providers
-- `reads_provider.dart` — player reads stream
-- `profile_provider.dart` — user profile
-
-Key providers:
-- `sessionsProvider` — `StreamProvider` backed by Supabase realtime
-- `filteredSessionsProvider` — derived from `sessionsProvider` + `filterProvider`
-- `handsProvider` — `FutureProvider` (fetch-once, not realtime)
-
-### Navigation
+### Navigation flow
 
 `main.dart → AuthGate → MainNavigation`
 
-`MainNavigation` is an `IndexedStack` with a `NavigationBar` (5 tabs: Dashboard, Sessions, Hands, Reads, Calendar). The side drawer (`AppDrawer`) is mounted on the root scaffold via `mainScaffoldKey` (a `GlobalKey<ScaffoldState>` in `app_drawer.dart`) — any screen can open the drawer using this key.
+`AuthGate` uses `StreamBuilder<AuthState>` + `AnimatedSwitcher` to fade between `SplashScreen` (while auth resolves), `LoginScreen`, and `MainNavigation`. The splash is shown until Supabase emits the first valid auth event — no minimum timer.
 
-Drawer sections: **Home** (pops to root) → **Tools** (Equity Calculator, ICM Calculator) → **App** (Help, About, Privacy, Feedback) → **Sign Out** (pinned).
+`MainNavigation` is an `IndexedStack` with a `NavigationBar` (5 tabs: Dashboard, Sessions, Hands, Reads, Calendar). The `AppDrawer` is mounted via `mainScaffoldKey` (a `GlobalKey<ScaffoldState>` exported from `app_drawer.dart`) so any screen can call `mainScaffoldKey.currentState?.openDrawer()`.
+
+Drawer sections: **Home** (Navigator.popUntil isFirst) → **Profile** → **TOOLS** (Equity Calculator, ICM Calculator) → **APP** (Help, About, Privacy, Feedback) → **Sign Out** (pinned). Tool screens pushed via Navigator.push must include `drawer: const AppDrawer()` on their Scaffold.
+
+### State management — Riverpod
+
+Service classes are plain Dart, wrapped in `Provider<>` at the provider layer. All providers live in `lib/providers/`.
+
+| Provider | Type | Notes |
+|---|---|---|
+| `sessionsProvider` | `StreamProvider` | Supabase realtime stream |
+| `filteredSessionsProvider` | `Provider` | derived from sessions + filter |
+| `filterProvider` | `StateProvider<SessionFilter>` | global session filter state |
+| `handsProvider` | `FutureProvider` | fetch-once, not realtime |
+| `tournamentListingsProvider` | `FutureProvider.autoDispose` | |
+| `readsProvider` | `StreamProvider` | in `reads_provider.dart` |
+| `profileProvider` | `FutureProvider` | in `profile_provider.dart` |
 
 ### Backend — Supabase
 
-All data is user-scoped via Row Level Security. Every table has `user_id uuid references auth.users` with RLS policies. Credentials are hardcoded in `lib/config/supabase_config.dart` (anon key — public by design for Supabase).
+All data is user-scoped via Row Level Security. Credentials live in `lib/config/supabase_config.dart` (anon key — public by design). All Supabase calls go through `withSupabaseRetry<T>()` (`lib/services/supabase_retry.dart`), which retries once on PGRST303 (JWT clock-skew error).
 
-**Tables:**
-- `sessions` — core session records
-- `hands` — poker hands stored as JSONB in `hand_data` column; `session_id` is nullable (hands can exist without a session)
-- `player_reads` + `player_read_notes` — opponent profiling
-- `rake_presets` — saved rake amounts per location/game/stakes combo
-- `profiles` — display name, phone, preferences
-- `ai_analyses` / `ai_hand_analyses` — cached AI results
-- `ai_usage_log` — rate-limit tracking (10 calls/day enforced in Edge Functions)
-- `tournament_listings` — scraped tournament schedule (shared, not user-scoped)
+**Tables:** `sessions`, `hands` (JSONB `hand_data`, nullable `session_id`), `player_reads`, `player_read_notes`, `rake_presets`, `profiles`, `ai_analyses`, `ai_hand_analyses`, `ai_usage_log`, `tournament_listings`.
 
-**Supabase Edge Functions** (Deno, in `supabase/functions/`):
-- `analyze-session` — calls Claude API, caches result in `ai_analyses`
-- `analyze-hand` — calls Claude API, caches result in `ai_hand_analyses`
-- `scrape-tournaments` — scrapes tournament listings
+**Edge Functions** (Deno, `supabase/functions/`):
+- `analyze-session` — Claude API call, cached in `ai_analyses`; limit 5/day per user
+- `analyze-hand` — Claude API call, cached in `ai_hand_analyses`; limit 20/day per user
+- `scrape-tournaments` — scrapes PokerNews, triggered by GitHub Actions weekly cron
+- Rate limits stored in `ai_usage_log`; `rhtk.1234@gmail.com` is exempt
 
-### Services
+### Splash screen
 
-All Supabase calls go through `withSupabaseRetry()` (`lib/services/supabase_retry.dart`), which retries once on PGRST303 (JWT issued-at-future, caused by device clock skew).
+Three layers, all matching background `#111811`:
+1. **Native** — generated by `flutter_native_splash` (config in `pubspec.yaml`); assets in `android/app/src/main/res/` and `ios/Runner/`; Android 12+ uses the Splash Screen API with icon on `#1B5E20` circle
+2. **Flutter overlay** — `lib/widgets/splash_screen.dart`; shown by `AuthGate` until auth resolves; fades out via `AnimatedSwitcher(duration: 350ms)`
+3. **Web** — custom HTML/CSS in `web/index.html`; branded splash div fades out on `flutter-first-frame` event
 
-- `SupabaseService` — session CRUD + realtime stream, rake presets, tournament listings
-- `HandService` — hand CRUD; generates UUIDs client-side
-- `ReadsService` — player read profiles + individual observation notes
-- `ProfileService` — profile fetch/upsert
-- `AiService` — invokes the two Edge Functions; throws if response contains `error` key
+### Equity Calculator
 
-### Pure Dart subsystems
+`lib/screens/equity_calculator_screen.dart` + `lib/widgets/equity/`.
 
-- **`lib/equity/`** — offline equity calculator: `card.dart` (card encoding), `evaluator.dart` (7-card evaluator via brute-force 5-card combinations), `simulator.dart` (Monte Carlo), `gto_ranges.dart` (preflop range matrices)
-- **`lib/reads/`** — `insights_engine.dart` (rule-based coaching tips from player tags), `tag_definitions.dart` (archetype/tendency tag metadata)
+Each player has two modes toggled in `PlayerRangeEditor`:
+- **Range mode** — 13×13 matrix cell selection + GTO presets; `expandCombos()` expands cells to all concrete card pairs
+- **Exact Hand mode** — two specific cards picked via `CardPickerSheet`; `expandCombos()` returns a single `[[card1, card2]]` combo
+
+Board cards and other exact-hand players' cards are passed as `excludedCards` to the card picker. Simulation runs via Monte Carlo (`lib/equity/simulator.dart`).
+
+### Key subsystems
+
+- **`lib/equity/`** — offline equity: card encoding (rank×4+suit), 7-card evaluator (brute-force 5-card combos), Monte Carlo simulator, GTO preflop ranges
+- **`lib/reads/`** — `insights_engine.dart` (rule-based coaching from player tags), `tag_definitions.dart`
+- **`lib/utils/helpers.dart`** — currency conversion, `parseBBFromStakes`, `calcBB100`, `formatPL`, `fieldSizeBucket`, all shared formatting
 
 ### Models
 
-`SessionModel` uses `fromMap()` (snake_case DB columns → camelCase Dart). `PokerHand` uses `fromJson()`/`toJson()` (the entire hand is serialized as JSONB). Models are immutable plain classes — no code generation.
+`SessionModel` — `fromMap()` (snake_case DB → camelCase Dart).  
+`PokerHand` — `fromJson()`/`toJson()` (entire hand serialized as JSONB); has optional `tournamentStage` and `TableSetup.ante` fields.  
+All models are plain immutable classes — no code generation.
 
-### Import/Export
+### Hand recording
 
-`ImportExportScreen` handles CSV and Excel (`.xlsx`) via the `csv` and `excel` packages. `ImportSourceScreen` + `ImportMappingScreen` handle the column-mapping flow for third-party exports.
+`HandInputScreen` supports tournament hands: `isTournamentSession` param shows stage dropdown, ante field, relabels stakes as "Blind Level". All-in runout: `_allInSeats` persists across streets; `_isAllInRunout` getter auto-deals remaining streets when ≤1 non-all-in player remains. Undo stack (`_HandSnapshot`) captures state before each action.
 
-### Web deployment
+### Critical patterns
 
-Built with `flutter build web --base-href /poker-tracker/` and deployed to GitHub Pages. The `--base-href` flag is required; omitting it breaks asset loading.
+**Async + ref after widget disposal** — always guard `ref` usage after any `await` with `if (!context.mounted) return;`. `AppDrawer._confirmSignOut` is the canonical example.
+
+**Dismissible + provider invalidation** — never call `ref.invalidate` in `onDismissed` without first removing the item from local state. Pattern: `ConsumerStatefulWidget` + `Set<String> _deletingIds`; add ID on dismiss, filter list in build, call service async. See `HandsScreen`.
+
+**Save button guard** — any form with an async save must have `bool _saving` that disables the button during the call to prevent double-submission.
+
+**fl_chart on Windows** — always set `barTouchData: BarTouchData(enabled: false)` and `lineTouchData: const LineTouchData(enabled: false)` on every chart. Default enabled state throws `RangeError` on Windows when mouse nears edge.
+
+### Web deployment — critical details
+
+- Custom domain `tablelab.app` → build with `--base-href /` (root, not `/tablelab/`)
+- Web build output goes into `docs/` folder on `main` branch (GitHub Pages source)
+- `docs/CNAME` must contain `tablelab.app` — preserve it on every deploy
+- `docs/.nojekyll` must exist — recreate after every wipe
+- PowerShell for the flutter build command; bash for the file copy
+
+### Android build
+
+- `compileSdk = 36` set in `android/app/build.gradle.kts`
+- Root `build.gradle.kts` uses `gradle.afterProject` hook to force compileSdk 36 on library subprojects
+- `INTERNET` permission explicitly declared in `AndroidManifest.xml` (required — flutter merger sometimes misses it after icon regeneration)
+- Package ID: `com.pokertracker.poker_tracker` (tied to Google OAuth — do not rename)
