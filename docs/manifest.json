@@ -1,13 +1,15 @@
 {
-    "name": "TableLab",
+    "name": "TableLab — Poker Bankroll Tracker",
     "short_name": "TableLab",
-    "start_url": ".",
+    "description": "Track your poker sessions, analyze your game with AI coaching, and calculate equity offline. Built for serious cash game and tournament players.",
+    "start_url": "/",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#111811",
+    "theme_color": "#1B5E20",
+    "orientation": "any",
+    "lang": "en",
     "prefer_related_applications": false,
+    "categories": ["finance", "sports", "utilities"],
     "icons": [
         {
             "src": "icons/Icon-192.png",
