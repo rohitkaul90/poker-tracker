@@ -242,7 +242,7 @@ class AppDrawer extends ConsumerWidget {
                         Navigator.pop(context);
                         launchUrl(Uri(
                           scheme: 'mailto',
-                          path: 'rhtk.1234@gmail.com',
+                          path: 'feedback@tablelab.app',
                           queryParameters: {'subject': 'TableLab Feedback'},
                         ));
                       },
@@ -290,8 +290,8 @@ class AppDrawer extends ConsumerWidget {
     );
     if (confirmed == true) {
       await Supabase.instance.client.auth.signOut();
-      // Widget is disposed by the time AuthGate switches to LoginScreen.
-      if (!context.mounted) return;
+      // Invalidate regardless of mounted — stale data must not persist for
+      // a different account that signs in next.
       ref.invalidate(sessionsProvider);
       ref.invalidate(handsProvider);
       ref.invalidate(filterProvider);

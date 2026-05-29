@@ -16,19 +16,27 @@ class DataPrivacyScreen extends StatelessWidget {
             icon: Icons.storage_outlined,
             title: 'What we collect',
             body:
-                'TableLab stores the data you enter: session records (stakes, '
-                'buy-ins, results, notes), hand histories you record, player '
-                'reads, and your account profile. Nothing is collected '
-                'automatically — every record exists because you created it.',
+                'TableLab stores the data you enter: your email address (for '
+                'account login), session records (stakes, buy-ins, cash-outs, '
+                'locations, dates, and notes), hand histories you record, '
+                'player reads, and your account profile including bankroll '
+                'information.\n\n'
+                'On Android, crash data is collected automatically by Firebase '
+                'Crashlytics when the app encounters an error. This includes '
+                'device model, OS version, and anonymised crash identifiers — '
+                'no personal poker data is included in crash reports.',
           ),
           _Section(
             icon: Icons.cloud_outlined,
             title: 'Where it\'s stored',
             body:
-                'Your data lives in a Supabase-managed Postgres database hosted '
-                'on AWS. Row-Level Security (RLS) policies ensure that only your '
-                'authenticated account can read or modify your records. '
-                'TableLab staff cannot query individual user data.',
+                'Your session and hand data is stored in a Supabase-managed '
+                'Postgres database hosted on Amazon Web Services (outside '
+                'Canada). Row-Level Security (RLS) policies ensure only your '
+                'authenticated account can read or write your records. '
+                'TableLab staff cannot query individual user data.\n\n'
+                'Crash data (Android) is processed by Firebase Crashlytics, '
+                'a Google service, on Google Cloud infrastructure.',
           ),
           _Section(
             icon: Icons.auto_awesome_outlined,
@@ -46,19 +54,30 @@ class DataPrivacyScreen extends StatelessWidget {
             icon: Icons.block_outlined,
             title: 'No tracking, no ads',
             body:
-                'TableLab does not use advertising SDKs, analytics trackers, '
-                'or third-party data brokers. Your poker data is yours. '
-                'We do not sell, rent, or share your personal information '
-                'with any third party.',
+                'TableLab does not use advertising SDKs or third-party data '
+                'brokers. Your poker data is yours. We do not sell, rent, or '
+                'share your personal information with any third party for '
+                'marketing purposes. We may add anonymous usage analytics in '
+                'future — this page will be updated when that occurs.',
           ),
           _Section(
             icon: Icons.manage_accounts_outlined,
             title: 'Your rights',
             body:
-                'You can export all your session data at any time via the '
-                'Import/Export screen. To request deletion of your account '
-                'and all associated data, contact us using the link below — '
-                'we will action it within 30 days.',
+                'You have the right to access, export, and delete your data.\n\n'
+                'Export: Use the Import/Export screen to download all your '
+                'session data as CSV or Excel at any time.\n\n'
+                'Deletion: To request deletion of your account and all '
+                'associated data, contact us using the link below — we will '
+                'complete deletion within 30 days.\n\n'
+                'EU/EEA users (GDPR): You also have the right to data '
+                'portability, the right to restrict processing, and the right '
+                'to lodge a complaint with your local data protection '
+                'authority.\n\n'
+                'California users (CCPA): You have the right to know what '
+                'personal information we hold and to request its deletion.\n\n'
+                'Canadian users (PIPEDA): You have the right to access your '
+                'personal information and to challenge its accuracy.',
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -66,9 +85,18 @@ class DataPrivacyScreen extends StatelessWidget {
             label: const Text('Contact for data requests'),
             onPressed: () => launchUrl(Uri(
               scheme: 'mailto',
-              path: 'rhtk.1234@gmail.com',
+              path: 'privacy@tablelab.app',
               queryParameters: {'subject': 'TableLab Data Request'},
             )),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: const Text('Full Privacy Policy (tablelab.app/privacy)'),
+            onPressed: () => launchUrl(
+              Uri.parse('https://tablelab.app/privacy'),
+              mode: LaunchMode.externalApplication,
+            ),
           ),
           const SizedBox(height: 32),
           Text(
