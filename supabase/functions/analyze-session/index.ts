@@ -612,7 +612,7 @@ serve(async (req: Request) => {
       apiKey: Deno.env.get("ANTHROPIC_API_KEY")!,
     });
 
-    const message = await anthropic.messages.create({
+    const claudeCall = anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 3000,
       system: [
@@ -630,6 +630,12 @@ serve(async (req: Request) => {
         { role: "user", content: buildUserPrompt(session, hands, reads) },
       ],
     });
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("CLAUDE_TIMEOUT")), 25000),
+    );
+
+    const message = await Promise.race([claudeCall, timeoutPromise]);
 
     // Tool use always returns valid structured JSON — no regex parsing needed
     const toolBlock = message.content.find((c) => c.type === "tool_use");
@@ -659,9 +665,15 @@ serve(async (req: Request) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("analyze-session error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+    if (msg === "CLAUDE_TIMEOUT") {
+      return new Response(
+        JSON.stringify({ error: "Analysis timed out. Please try again." }),
+        { status: 504, headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
+    return new Response(
+      JSON.stringify({ error: "Analysis failed. Please try again." }),
+      { status: 500, headers: { ...cors, "Content-Type": "application/json" } },
+    );
   }
 });
