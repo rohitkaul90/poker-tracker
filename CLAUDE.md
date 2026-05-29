@@ -12,32 +12,50 @@ flutter run -d windows            # Windows desktop
 
 # Build
 flutter build apk
-flutter build web --release --base-href "/"   # custom domain (tablelab.app) — PowerShell only
-# IMPORTANT: run the build in PowerShell, not bash; bash on Windows mangles the bare /
+flutter build appbundle --release                        # Play Store AAB
+flutter build web --release --base-href "/"              # custom domain — PowerShell only
+# IMPORTANT: run web build in PowerShell, not bash; bash on Windows mangles the bare /
 
 # Deploy to GitHub Pages (after web build)
 # Run in bash:
 CNAME=$(cat docs/CNAME) && cp -r build/web/. docs/ && echo "$CNAME" > docs/CNAME && touch docs/.nojekyll
 # Then commit and push docs/
 
-# Dependencies
+# Dependencies / analysis / tests
 flutter pub get
-
-# Static analysis
 flutter analyze
-
-# Tests
 flutter test
+flutter test --coverage           # generates coverage/lcov.info
 
-# Regenerate native splash assets (after changing flutter_native_splash config in pubspec.yaml)
+# Version bump (increments build number, commits, tags — triggers CI builds)
+bash scripts/bump-version.sh 1.2.0
+
+# Asset regeneration
 dart run flutter_native_splash:create
-
-# Regenerate launcher icons (after changing flutter_launcher_icons config)
 dart run flutter_launcher_icons
-
-# Code generation (if @riverpod annotations are added)
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build --delete-conflicting-outputs   # only if @riverpod annotations added
 ```
+
+## Slash-command agents
+
+Twelve specialist agents live in `.claude/commands/`. Invoke with `/agent-name [args]`:
+
+| Command | Role | Scope |
+|---|---|---|
+| `/release-orchestrator` | Phase gate status + 72h action plan | Read-only audit |
+| `/security-analyst` | RLS, secrets, OWASP, data-flow doc | Reads + fixes code |
+| `/cloud-architect` | Supabase scaling, schema, Edge Functions | Reads + migrations |
+| `/platform-engineer` | Flutter features, GDPR, tests, analyzer | Full code changes |
+| `/devops-engineer` | GitHub Actions CI/CD pipelines | Writes workflows |
+| `/qa-reliability` | Test suite, 60-row manual matrix, sign-off | Reads + writes tests |
+| `/web-engineer` | manifest.json, meta tags, Cloudflare | web/ + Dart fixes |
+| `/mobile-specialist` | Android/iOS native, store submissions | Native configs |
+| `/ai-data-engineer` | Claude API, cost model, PostHog analytics | Edge Functions |
+| `/legal-compliance` | Privacy policy, GDPR, store labels | Docs + screens |
+| `/bizops` | Unit economics, pricing, RevenueCat | Analysis + docs |
+| `/growth` | ASO, Reddit/PH launch, viral loop spec | Copy + specs |
+
+Start any new session on launch work with `/release-orchestrator` — it reads the actual codebase state and outputs a prioritized action plan.
 
 ## Architecture
 
@@ -70,40 +88,46 @@ Service classes are plain Dart, wrapped in `Provider<>` at the provider layer. A
 | `readsProvider` | `StreamProvider` | in `reads_provider.dart` |
 | `profileProvider` | `FutureProvider` | in `profile_provider.dart`; watches `authUserIdProvider` |
 
-**Cross-account scoping** — every user-scoped provider must `ref.watch(authUserIdProvider)` so it restarts when a different account signs in. Without this, providers created at app start keep streaming the first user's data. After any write (insert/update/delete), call `ref.invalidate(sessionsProvider)` in the screen — Supabase `.stream()` requires Realtime enabled on the table to push live changes; explicit invalidation is the reliable fallback.
+**Cross-account scoping** — every user-scoped provider must `ref.watch(authUserIdProvider)` so it restarts when a different account signs in. After any write (insert/update/delete), call `ref.invalidate(sessionsProvider)` — Supabase `.stream()` requires Realtime enabled to push live changes; explicit invalidation is the reliable fallback.
 
 ### Backend — Supabase
 
-All data is user-scoped via Row Level Security. Credentials live in `lib/config/supabase_config.dart` (anon key — public by design). All Supabase calls go through `withSupabaseRetry<T>()` (`lib/services/supabase_retry.dart`), which retries once on PGRST303 (JWT clock-skew error).
+All data is user-scoped via Row Level Security. Credentials live in `lib/config/supabase_config.dart` (anon key — public by design; file is gitignored). All Supabase calls go through `withSupabaseRetry<T>()` (`lib/services/supabase_retry.dart`), which retries once on PGRST303 (JWT clock-skew error).
 
 **Tables:** `sessions`, `hands` (JSONB `hand_data`, nullable `session_id`), `player_reads`, `player_read_notes`, `rake_presets`, `profiles` (includes `starting_bankroll numeric`, `starting_bankroll_currency text`), `ai_analyses`, `ai_hand_analyses`, `ai_usage_log`, `tournament_listings`.
 
 **Edge Functions** (Deno, `supabase/functions/`):
-- `analyze-session` — Claude API call, cached in `ai_analyses`; limit 5/day per user
-- `analyze-hand` — Claude API call, cached in `ai_hand_analyses`; limit 20/day per user
-- `scrape-tournaments` — scrapes PokerNews, triggered by GitHub Actions weekly cron
-- Rate limits stored in `ai_usage_log`; `rhtk.1234@gmail.com` is exempt
+- `analyze-session` — Claude Sonnet call via tool use; result cached in `ai_analyses`; limit 5/day per user
+- `analyze-hand` — Claude Sonnet call via tool use; result cached in `ai_hand_analyses`; limit 20/day per user
+- `scrape-tournaments` — scrapes PokerNews, triggered by weekly GitHub Actions cron
+- Rate limits in `ai_usage_log`; `rhtk.1234@gmail.com` is exempt
+
+**Edge Function patterns:**
+- `SYSTEM_PROMPT` is a `const` string with `cache_control: { type: "ephemeral" }` — must stay static (no per-user data) for Anthropic prompt caching to work
+- Cache check → rate limit check → Claude API call (this order is critical — cache hits are free)
+- `computeDrawSummary()` injects deterministic `[FACT —` annotations into the user prompt — do not remove; these ground the model's hand-reading
+- `buildPrompt()` tracks per-street `streetContrib` maps for accurate incremental call amounts
 
 ### Firebase Crashlytics
 
-Active on Android/iOS only. `lib/firebase_options.dart` is generated (not a stub) — do not overwrite it. `main.dart` routes `FlutterError` and `PlatformDispatcher` errors to Crashlytics, guarded by `if (!kIsWeb)` — Crashlytics throws on web. `android/app/google-services.json` is committed and required for Android builds.
+Active on Android only. `lib/firebase_options.dart` is generated (not a stub) — do not overwrite it. `main.dart` routes `FlutterError` and `PlatformDispatcher` errors to Crashlytics, guarded by `if (!kIsWeb)` — Crashlytics throws on web. `android/app/google-services.json` is committed and required for Android builds.
 
 ### Splash screen
 
 Three layers, all matching background `#111811`:
-1. **Native** — generated by `flutter_native_splash` (config in `pubspec.yaml`); assets in `android/app/src/main/res/` and `ios/Runner/`; Android 12+ uses the Splash Screen API with icon on `#1B5E20` circle
-2. **Flutter overlay** — `lib/widgets/splash_screen.dart`; shown by `AuthGate` until auth resolves; fades out via `AnimatedSwitcher(duration: 350ms)`
-3. **Web** — custom HTML/CSS in `web/index.html`; branded splash div fades out on `flutter-first-frame` event
+1. **Native** — generated by `flutter_native_splash`; assets in `android/app/src/main/res/` and `ios/Runner/`; Android 12+ uses Splash Screen API with icon on `#1B5E20` circle
+2. **Flutter overlay** — `lib/widgets/splash_screen.dart`; shown by `AuthGate` until auth resolves; fades via `AnimatedSwitcher(duration: 350ms)`
+3. **Web** — custom HTML/CSS in `web/index.html`; splash div fades out on `flutter-first-frame` event
 
 ### Equity Calculator
 
 `lib/screens/equity_calculator_screen.dart` + `lib/widgets/equity/`.
 
 Each player has two modes toggled in `PlayerRangeEditor`:
-- **Range mode** — 13×13 matrix cell selection + GTO presets; `expandCombos()` expands cells to all concrete card pairs
-- **Exact Hand mode** — two specific cards picked via `CardPickerSheet`; `expandCombos()` returns a single `[[card1, card2]]` combo
+- **Range mode** — 13×13 matrix + GTO presets; `expandCombos()` expands to all concrete card pairs
+- **Exact Hand mode** — two specific cards via `CardPickerSheet`; `expandCombos()` returns a single `[[card1, card2]]`
 
-Board cards and other exact-hand players' cards are passed as `excludedCards` to the card picker. Simulation runs via Monte Carlo (`lib/equity/simulator.dart`).
+Board cards and other exact-hand players' cards are passed as `excludedCards`. Simulation runs via Monte Carlo (`lib/equity/simulator.dart`).
 
 ### Key subsystems
 
@@ -141,7 +165,29 @@ All models are plain immutable classes — no code generation.
 
 ### Android build
 
-- `compileSdk = 36` set in `android/app/build.gradle.kts`
-- Root `build.gradle.kts` uses `gradle.afterProject` hook to force compileSdk 36 on library subprojects
-- `INTERNET` permission explicitly declared in `AndroidManifest.xml` (required — flutter merger sometimes misses it after icon regeneration)
+- `compileSdk = 36` in `android/app/build.gradle.kts`; root `build.gradle.kts` forces compileSdk 36 on library subprojects via `gradle.afterProject`
+- Release build currently uses **debug signing** (`signingConfigs.getByName("debug")`) — must be replaced with a proper release keystore before Play Store submission (see `/mobile-specialist signing`)
+- `INTERNET` permission explicitly declared in `AndroidManifest.xml` (flutter merger sometimes drops it after icon regeneration)
 - Package ID: `com.pokertracker.poker_tracker` (tied to Google OAuth — do not rename)
+- `minSdk` should be 23 (flutter_secure_storage requires API 23+); `targetSdk` should be 35 (Play Store mandates ≥34)
+
+### iOS build
+
+- `ios/Runner/Info.plist` `CFBundleDisplayName` is currently `"Poker Tracker"` — must be changed to `"TableLab"` before any TestFlight/App Store build
+- `flutter_launcher_icons` has `ios: false` in `pubspec.yaml` — change to `true` before the first iOS build, then run `dart run flutter_launcher_icons`
+- `ios/Runner/PrivacyInfo.xcprivacy` does not yet exist — required by Apple since May 2024; see `/mobile-specialist privacy-manifest`
+- iOS builds require a macOS machine; cannot be built on Windows
+
+### Pending critical work (not yet implemented)
+
+These are known gaps that will cause store rejection or legal issues:
+
+| Item | Owner agent | Blocker for |
+|---|---|---|
+| Delete-account feature (GDPR right to erasure) | `/platform-engineer gdpr` | Apple App Store, GDPR |
+| Release signing config in `build.gradle.kts` | `/mobile-specialist signing` | Play Store submission |
+| `ios/Runner/Info.plist` display name fix | `/mobile-specialist ios` | All iOS builds |
+| Privacy policy at `tablelab.app/privacy` (URL) | `/legal-compliance privacy-policy` | Apple App Store |
+| `web/manifest.json` brand colors + description | `/web-engineer manifest` | Web quality |
+| `<meta name="viewport">` in `web/index.html` | `/web-engineer meta` | Mobile web usability |
+| Anthropic spend cap ($100/month hard limit) | Manual: console.anthropic.com | Cost control |

@@ -92,13 +92,32 @@ class TermsOfServiceScreen extends StatelessWidget {
                 'reserve the right to suspend or terminate accounts that violate '
                 'these terms.',
           ),
+          _Section(
+            icon: Icons.balance_outlined,
+            title: 'Governing law',
+            body:
+                'These Terms are governed by and construed in accordance with '
+                'the laws of the Province of Ontario and the federal laws of '
+                'Canada applicable therein. You agree that any dispute arising '
+                'from these Terms or your use of TableLab shall be subject to '
+                'the exclusive jurisdiction of the courts of Ontario, Canada, '
+                'unless prohibited by your local consumer protection laws.',
+          ),
+          _Section(
+            icon: Icons.contact_support_outlined,
+            title: 'Contact',
+            body:
+                'For questions about these Terms, privacy requests, or to '
+                'report a violation, contact us at privacy@tablelab.app. '
+                'We aim to respond within 30 business days.',
+          ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             icon: const Icon(Icons.mail_outline, size: 18),
             label: const Text('Contact us'),
             onPressed: () => launchUrl(Uri(
               scheme: 'mailto',
-              path: 'rhtk.1234@gmail.com',
+              path: 'privacy@tablelab.app',
               queryParameters: {'subject': 'TableLab Terms Enquiry'},
             )),
           ),
