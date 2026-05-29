@@ -10,6 +10,7 @@ import '../screens/about_screen.dart';
 import '../screens/data_privacy_screen.dart';
 import '../screens/terms_of_service_screen.dart';
 import '../screens/help_screen.dart';
+import '../screens/settings_screen.dart';
 import '../screens/equity_calculator_screen.dart';
 import '../screens/icm_calculator_screen.dart';
 
@@ -177,6 +178,20 @@ class AppDrawer extends ConsumerWidget {
 
                     // ── App section ──────────────────────────────────────
                     _SectionLabel('APP', theme),
+                    ListTile(
+                      leading: const Icon(Icons.settings_outlined),
+                      title: const Text('Settings'),
+                      subtitle: const Text('Account management, delete account',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SettingsScreen()),
+                        );
+                      },
+                    ),
                     ListTile(
                       leading: const Icon(Icons.help_outline_rounded),
                       title: const Text('Help & FAQ'),

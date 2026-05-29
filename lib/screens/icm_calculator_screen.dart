@@ -74,14 +74,14 @@ class _IcmCalculatorScreenState extends State<IcmCalculatorScreen> {
   void initState() {
     super.initState();
     // Start with 3 players and 3 payouts as a sensible default
-    for (int i = 0; i < 3; i++) _addPlayer();
-    for (int i = 0; i < 3; i++) _addPayout();
+    for (int i = 0; i < 3; i++) { _addPlayer(); }
+    for (int i = 0; i < 3; i++) { _addPayout(); }
   }
 
   @override
   void dispose() {
-    for (final p in _players) p.dispose();
-    for (final c in _payouts) c.dispose();
+    for (final p in _players) { p.dispose(); }
+    for (final c in _payouts) { c.dispose(); }
     super.dispose();
   }
 

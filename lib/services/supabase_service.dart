@@ -95,4 +95,12 @@ class SupabaseService {
         .order('start_date'));
     return (rows as List).map((r) => TournamentListing.fromMap(r as Map<String, dynamic>)).toList();
   }
+
+  Future<void> deleteAccount() async {
+    if (_uid == null) throw Exception('Not authenticated');
+    final response = await _client.functions.invoke('delete-account');
+    if (response.status != 200) {
+      throw Exception('Account deletion failed (${response.status})');
+    }
+  }
 }

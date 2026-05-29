@@ -1601,9 +1601,9 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
     _anteCtrl.dispose();
     _tournSbCtrl.dispose();
     _tournBbCtrl.dispose();
-    for (final c in _nameCtrl) c.dispose();
-    for (final f in _nameFocusNodes) f.dispose();
-    for (final c in _stackCtrl) c.dispose();
+    for (final c in _nameCtrl) { c.dispose(); }
+    for (final f in _nameFocusNodes) { f.dispose(); }
+    for (final c in _stackCtrl) { c.dispose(); }
     super.dispose();
   }
 }
@@ -1700,7 +1700,7 @@ class _SessionPickerTile extends ConsumerWidget {
 
     return sessionsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (sessions) {
         if (sessions.isEmpty) return const SizedBox.shrink();
 
