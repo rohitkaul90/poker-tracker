@@ -49,9 +49,11 @@ dart run build_runner build --delete-conflicting-outputs
 
 `AuthGate` uses `StreamBuilder<AuthState>` + `AnimatedSwitcher` to fade between `SplashScreen` (while auth resolves), `LoginScreen`, and `MainNavigation`. The splash is shown until Supabase emits the first valid auth event — no minimum timer.
 
-`MainNavigation` is an `IndexedStack` with a `NavigationBar` (5 tabs: Dashboard, Sessions, Hands, Reads, Calendar). The `AppDrawer` is mounted via `mainScaffoldKey` (a `GlobalKey<ScaffoldState>` exported from `app_drawer.dart`) so any screen can call `mainScaffoldKey.currentState?.openDrawer()`.
+`MainNavigation` is an `IndexedStack` with a `NavigationBar` (5 tabs: Dashboard, Sessions, Hands, Reads, Tournaments). The `AppDrawer` is mounted via `mainScaffoldKey` (a `GlobalKey<ScaffoldState>` exported from `app_drawer.dart`) so any screen can call `mainScaffoldKey.currentState?.openDrawer()`.
 
-Drawer sections: **Home** (Navigator.popUntil isFirst) → **Profile** → **TOOLS** (Equity Calculator, ICM Calculator) → **APP** (Help, About, Privacy, Feedback) → **Sign Out** (pinned). Tool screens pushed via Navigator.push must include `drawer: const AppDrawer()` on their Scaffold.
+Drawer sections: **Home** (Navigator.popUntil isFirst) → **Profile** → **TOOLS** (Equity Calculator, ICM Calculator) → **APP** (Help, About, Terms of Service, Data & Privacy, Feedback) → **Sign Out** (pinned). Tool screens pushed via Navigator.push must include `drawer: const AppDrawer()` on their Scaffold.
+
+`AuthGate` also handles `AuthChangeEvent.passwordRecovery` → shows `ResetPasswordScreen` (set new password + auto sign-out on success).
 
 ### State management — Riverpod
 
@@ -59,25 +61,32 @@ Service classes are plain Dart, wrapped in `Provider<>` at the provider layer. A
 
 | Provider | Type | Notes |
 |---|---|---|
-| `sessionsProvider` | `StreamProvider` | Supabase realtime stream |
+| `authUserIdProvider` | `StreamProvider<String?>` | emits current user ID on auth change |
+| `sessionsProvider` | `StreamProvider` | Supabase stream; watches `authUserIdProvider` |
 | `filteredSessionsProvider` | `Provider` | derived from sessions + filter |
 | `filterProvider` | `StateProvider<SessionFilter>` | global session filter state |
-| `handsProvider` | `FutureProvider` | fetch-once, not realtime |
+| `handsProvider` | `FutureProvider` | fetch-once; watches `authUserIdProvider` |
 | `tournamentListingsProvider` | `FutureProvider.autoDispose` | |
 | `readsProvider` | `StreamProvider` | in `reads_provider.dart` |
-| `profileProvider` | `FutureProvider` | in `profile_provider.dart` |
+| `profileProvider` | `FutureProvider` | in `profile_provider.dart`; watches `authUserIdProvider` |
+
+**Cross-account scoping** — every user-scoped provider must `ref.watch(authUserIdProvider)` so it restarts when a different account signs in. Without this, providers created at app start keep streaming the first user's data. After any write (insert/update/delete), call `ref.invalidate(sessionsProvider)` in the screen — Supabase `.stream()` requires Realtime enabled on the table to push live changes; explicit invalidation is the reliable fallback.
 
 ### Backend — Supabase
 
 All data is user-scoped via Row Level Security. Credentials live in `lib/config/supabase_config.dart` (anon key — public by design). All Supabase calls go through `withSupabaseRetry<T>()` (`lib/services/supabase_retry.dart`), which retries once on PGRST303 (JWT clock-skew error).
 
-**Tables:** `sessions`, `hands` (JSONB `hand_data`, nullable `session_id`), `player_reads`, `player_read_notes`, `rake_presets`, `profiles`, `ai_analyses`, `ai_hand_analyses`, `ai_usage_log`, `tournament_listings`.
+**Tables:** `sessions`, `hands` (JSONB `hand_data`, nullable `session_id`), `player_reads`, `player_read_notes`, `rake_presets`, `profiles` (includes `starting_bankroll numeric`, `starting_bankroll_currency text`), `ai_analyses`, `ai_hand_analyses`, `ai_usage_log`, `tournament_listings`.
 
 **Edge Functions** (Deno, `supabase/functions/`):
 - `analyze-session` — Claude API call, cached in `ai_analyses`; limit 5/day per user
 - `analyze-hand` — Claude API call, cached in `ai_hand_analyses`; limit 20/day per user
 - `scrape-tournaments` — scrapes PokerNews, triggered by GitHub Actions weekly cron
 - Rate limits stored in `ai_usage_log`; `rhtk.1234@gmail.com` is exempt
+
+### Firebase Crashlytics
+
+Active on Android. `lib/firebase_options.dart` is generated (not a stub) — do not overwrite it. `main.dart` routes `FlutterError` and `PlatformDispatcher` errors to Crashlytics. `android/app/google-services.json` is committed and required for Android builds.
 
 ### Splash screen
 
