@@ -52,3 +52,5 @@ app.*.map.json
 
 # Android release keystore — never commit
 android/app/tablelab-release.jks
+android/build/
+supabase/.temp/
