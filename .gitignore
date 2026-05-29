@@ -49,3 +49,6 @@ app.*.map.json
 
 # Scratch/dev-only directories
 /test_imports/
+
+# Android release keystore — never commit
+android/app/tablelab-release.jks
