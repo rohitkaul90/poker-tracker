@@ -86,7 +86,7 @@ All data is user-scoped via Row Level Security. Credentials live in `lib/config/
 
 ### Firebase Crashlytics
 
-Active on Android. `lib/firebase_options.dart` is generated (not a stub) — do not overwrite it. `main.dart` routes `FlutterError` and `PlatformDispatcher` errors to Crashlytics. `android/app/google-services.json` is committed and required for Android builds.
+Active on Android/iOS only. `lib/firebase_options.dart` is generated (not a stub) — do not overwrite it. `main.dart` routes `FlutterError` and `PlatformDispatcher` errors to Crashlytics, guarded by `if (!kIsWeb)` — Crashlytics throws on web. `android/app/google-services.json` is committed and required for Android builds.
 
 ### Splash screen
 
