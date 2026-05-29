@@ -242,8 +242,19 @@ class SessionDetailScreen extends ConsumerWidget {
       ),
     );
     if (confirmed == true && context.mounted) {
-      await ref.read(supabaseServiceProvider).deleteSession(session.id);
-      if (context.mounted) Navigator.pop(context);
+      try {
+        await ref.read(supabaseServiceProvider).deleteSession(session.id);
+        if (context.mounted) {
+          ref.invalidate(sessionsProvider);
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete session: $e')),
+          );
+        }
+      }
     }
   }
 }

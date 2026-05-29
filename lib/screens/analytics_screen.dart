@@ -1506,7 +1506,7 @@ class _RecommendationsCard extends StatelessWidget {
           return '$bestKey is your strongest venue';
         case 'live/online':
           return bestScore > 0
-              ? '${bestKey} poker is your stronger format'
+              ? '$bestKey poker is your stronger format'
               : 'Shift focus to ${worstKey == bestKey ? 'the other format' : worstKey}';
         default:
           return 'Favour $bestKey over $worstKey';
@@ -1542,7 +1542,7 @@ class _RecommendationsCard extends StatelessWidget {
       final diff = bestScore - worstScore;
       final diffFmt = formatROI(diff);
       return '$bestFmt ROI in $bestKey'
-          '${diff > 0 ? ' — ${diffFmt} better than $worstKey ($worstFmt)' : ''}.'
+          '${diff > 0 ? ' — $diffFmt better than $worstKey ($worstFmt)' : ''}.'
           ' Your overall ROI is $overallFmt.';
     }
     final bestFmt = formatPLWithCurrency(bestScore, displayCurrency);

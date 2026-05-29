@@ -737,7 +737,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
           )
         else
           DropdownButtonFormField<String>(
-            value: _selectedStakes,
+            initialValue: _selectedStakes,
             decoration: const InputDecoration(
               prefixText: '\$',
               border: OutlineInputBorder(),
@@ -789,7 +789,7 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
 
           // ── Tournament stage ───────────────────────────────────────────────
           DropdownButtonFormField<String?>(
-            value: _tournamentStage,
+            initialValue: _tournamentStage,
             decoration: const InputDecoration(
               labelText: 'Tournament Stage (optional)',
               border: OutlineInputBorder(),
@@ -843,14 +843,14 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
         const Text('Leave stack blank for default',
             style: TextStyle(color: Colors.white38, fontSize: 11)),
         const SizedBox(height: 8),
-        ...List.generate(_numSeats, (i) {
-          final pos = _positions[i];
-          final readsNames = ref
-                  .watch(readsProvider)
-                  .valueOrNull
+        ...() {
+          // Fetch reads once; ref.watch called only here, not once per seat.
+          final readsNames = ref.watch(readsProvider).valueOrNull
                   ?.map((r) => r.playerLabel)
                   .toList() ??
               [];
+          return List.generate(_numSeats, (i) {
+            final pos = _positions[i];
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(children: [
@@ -963,7 +963,8 @@ class _HandInputScreenState extends ConsumerState<HandInputScreen> {
               ),
             ]),
           );
-        }),
+          });
+        }(),
         const SizedBox(height: 24),
         FilledButton(
           onPressed: _canStart ? _startHand : null,
@@ -1719,7 +1720,7 @@ class _SessionPickerTile extends ConsumerWidget {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String?>(
-              value: selectedSessionId,
+              initialValue: selectedSessionId,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 isDense: true,

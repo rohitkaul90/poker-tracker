@@ -35,29 +35,31 @@ class _ReadsScreenState extends ConsumerState<ReadsScreen> {
       builder: (_) => QuickAddSheet(
         allPlayers: allPlayers,
         onSaved: (label, tags, note) async {
-          final read = await svc.createRead(playerLabel: label, tags: tags);
-          if (note != null && !note.noteText.isNullOrEmpty &&
-              (note.noteText != null || note.position != null ||
-               note.action != null || note.street != null)) {
-            await svc.addNote(
-              read.id,
-              noteText: note.noteText,
-              position: note.position,
-              action: note.action,
-              sizing: note.sizing,
-              street: note.street,
-              cardsShown: note.cardsShown,
-            );
-          } else if (note != null) {
-            await svc.addNote(
-              read.id,
-              noteText: note.noteText,
-              position: note.position,
-              action: note.action,
-              sizing: note.sizing,
-              street: note.street,
-              cardsShown: note.cardsShown,
-            );
+          try {
+            final read = await svc.createRead(playerLabel: label, tags: tags);
+            if (note != null &&
+                (note.noteText?.isNotEmpty == true ||
+                    note.position != null ||
+                    note.action != null ||
+                    note.street != null ||
+                    note.sizing != null ||
+                    note.cardsShown != null)) {
+              await svc.addNote(
+                read.id,
+                noteText: note.noteText,
+                position: note.position,
+                action: note.action,
+                sizing: note.sizing,
+                street: note.street,
+                cardsShown: note.cardsShown,
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to save read: $e')),
+              );
+            }
           }
         },
       ),
@@ -274,6 +276,3 @@ class _ReadTile extends StatelessWidget {
   }
 }
 
-extension on String? {
-  bool get isNullOrEmpty => this == null || this!.isEmpty;
-}

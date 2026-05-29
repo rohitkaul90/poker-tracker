@@ -32,8 +32,13 @@ class _ReadDetailScreenState extends ConsumerState<ReadDetailScreen> {
     try {
       final notes = await ref.read(readsServiceProvider).fetchNotes(_read.id);
       if (mounted) { setState(() { _notes = notes; _loadingNotes = false; }); }
-    } catch (_) {
-      if (mounted) { setState(() => _loadingNotes = false); }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingNotes = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load notes: $e')),
+        );
+      }
     }
   }
 
@@ -50,27 +55,42 @@ class _ReadDetailScreenState extends ConsumerState<ReadDetailScreen> {
         existingPlayer: _read,
         allPlayers: allPlayers,
         onSaved: (label, tags, note) async {
-          // Update label/tags if changed
-          if (label != _read.playerLabel || !_tagsEqual(tags, _read.tags)) {
-            await svc.updateRead(_read.id, playerLabel: label, tags: tags);
-          }
-          if (note != null) {
-            await svc.addNote(
-              _read.id,
-              noteText: note.noteText,
-              position: note.position,
-              action: note.action,
-              sizing: note.sizing,
-              street: note.street,
-              cardsShown: note.cardsShown,
-            );
-          }
-          await _loadNotes();
-          // Refresh the read (tags may have changed)
-          final reads = ref.read(readsProvider).valueOrNull;
-          if (reads != null) {
-            final updated = reads.where((r) => r.id == _read.id).firstOrNull;
-            if (updated != null && mounted) { setState(() => _read = updated); }
+          try {
+            // Update label/tags if changed
+            if (label != _read.playerLabel || !_tagsEqual(tags, _read.tags)) {
+              await svc.updateRead(_read.id, playerLabel: label, tags: tags);
+            }
+            if (note != null &&
+                (note.noteText?.isNotEmpty == true ||
+                    note.position != null ||
+                    note.action != null ||
+                    note.street != null ||
+                    note.sizing != null ||
+                    note.cardsShown != null)) {
+              await svc.addNote(
+                _read.id,
+                noteText: note.noteText,
+                position: note.position,
+                action: note.action,
+                sizing: note.sizing,
+                street: note.street,
+                cardsShown: note.cardsShown,
+              );
+            }
+            if (!mounted) return;
+            await _loadNotes();
+            // Refresh the read (tags may have changed)
+            final reads = ref.read(readsProvider).valueOrNull;
+            if (reads != null) {
+              final updated = reads.where((r) => r.id == _read.id).firstOrNull;
+              if (updated != null && mounted) { setState(() => _read = updated); }
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to save: $e')),
+              );
+            }
           }
         },
       ),
@@ -87,16 +107,24 @@ class _ReadDetailScreenState extends ConsumerState<ReadDetailScreen> {
       builder: (_) => _EditNoteSheet(
         note: note,
         onSave: (noteText, position, action, sizing, street, cardsShown) async {
-          await ref.read(readsServiceProvider).updateNote(
-            note.id,
-            noteText: noteText,
-            position: position,
-            action: action,
-            sizing: sizing,
-            street: street,
-            cardsShown: cardsShown,
-          );
-          await _loadNotes();
+          try {
+            await ref.read(readsServiceProvider).updateNote(
+              note.id,
+              noteText: noteText,
+              position: position,
+              action: action,
+              sizing: sizing,
+              street: street,
+              cardsShown: cardsShown,
+            );
+            if (mounted) await _loadNotes();
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to update note: $e')),
+              );
+            }
+          }
         },
       ),
     );

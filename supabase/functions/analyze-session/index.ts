@@ -212,15 +212,24 @@ function computeDrawSummary(holeCards: string[], boardCards: string[]): string {
   const boardVals = boardRanks.map((r) => RANK_VAL[r] ?? 0).sort((a, b) => b - a);
   const presentVals = new Set(allCards.map((c) => RANK_VAL[cRank(c)]).filter(Boolean));
 
-  // ── Straight draws ────────────────────────────────────────────────────────
+  // ── Straight draws (scan HIGH→LOW for made straights first) ──────────────
   const completingVals = new Set<number>();
   let madeStraight = false;
-  for (let low = 1; low <= 10; low++) {
+  for (let low = 10; low >= 1; low--) {
     const window = low === 1 ? [14, 2, 3, 4, 5] : [low, low+1, low+2, low+3, low+4];
     const inW = window.filter((v) => presentVals.has(v));
     const outW = window.filter((v) => !presentVals.has(v));
     if (inW.length === 5) { madeStraight = true; break; }
-    if (inW.length === 4 && outW.length === 1) completingVals.add(outW[0]);
+    if (!madeStraight && inW.length === 4 && outW.length === 1) completingVals.add(outW[0]);
+  }
+  // Also scan upward for any draws not caught above
+  if (!madeStraight) {
+    for (let low = 1; low <= 10; low++) {
+      const window = low === 1 ? [14, 2, 3, 4, 5] : [low, low+1, low+2, low+3, low+4];
+      const inW = window.filter((v) => presentVals.has(v));
+      const outW = window.filter((v) => !presentVals.has(v));
+      if (inW.length === 4 && outW.length === 1) completingVals.add(outW[0]);
+    }
   }
 
   let straightLine: string;
