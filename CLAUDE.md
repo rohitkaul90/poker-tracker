@@ -26,9 +26,16 @@ flutter pub get
 flutter analyze
 flutter test
 flutter test --coverage           # generates coverage/lcov.info
+flutter test test/utils/helpers_test.dart   # run a single test file
 
-# Version bump (increments build number, commits, tags — triggers CI builds)
+# Version bump (increments build number, commits, tags — triggers CI AAB build)
 bash scripts/bump-version.sh 1.2.0
+
+# Supabase Edge Functions (requires supabase CLI + login)
+supabase functions deploy delete-account
+supabase functions deploy analyze-session
+supabase functions deploy analyze-hand
+supabase db push                  # apply pending migrations
 
 # Asset regeneration
 dart run flutter_native_splash:create
@@ -69,7 +76,7 @@ Start any new session on launch work with `/release-orchestrator` — it reads t
 
 `MainNavigation` is an `IndexedStack` with a `NavigationBar` (5 tabs: Dashboard, Sessions, Hands, Reads, Tournaments). The `AppDrawer` is mounted via `mainScaffoldKey` (a `GlobalKey<ScaffoldState>` exported from `app_drawer.dart`) so any screen can call `mainScaffoldKey.currentState?.openDrawer()`.
 
-Drawer sections: **Home** (Navigator.popUntil isFirst) → **Profile** → **TOOLS** (Equity Calculator, ICM Calculator) → **APP** (Help, About, Terms of Service, Data & Privacy, Feedback) → **Sign Out** (pinned). Tool screens pushed via Navigator.push must include `drawer: const AppDrawer()` on their Scaffold.
+Drawer sections: **Home** (Navigator.popUntil isFirst) → **Profile** → **TOOLS** (Equity Calculator, ICM Calculator) → **APP** (Settings, Help, About, Terms of Service, Data & Privacy, Feedback) → **Sign Out** (pinned). Tool screens pushed via Navigator.push must include `drawer: const AppDrawer()` on their Scaffold.
 
 `AuthGate` also handles `AuthChangeEvent.passwordRecovery` → shows `ResetPasswordScreen` (set new password + auto sign-out on success).
 
@@ -96,17 +103,36 @@ All data is user-scoped via Row Level Security. Credentials live in `lib/config/
 
 **Tables:** `sessions`, `hands` (JSONB `hand_data`, nullable `session_id`), `player_reads`, `player_read_notes`, `rake_presets`, `profiles` (includes `starting_bankroll numeric`, `starting_bankroll_currency text`), `ai_analyses`, `ai_hand_analyses`, `ai_usage_log`, `tournament_listings`.
 
+**Note:** `sessions`, `hands`, and `rake_presets` were created directly in the Supabase dashboard before the migration workflow was established — their DDL is not in `supabase/migrations/`. All other tables have migration files.
+
 **Edge Functions** (Deno, `supabase/functions/`):
-- `analyze-session` — Claude Sonnet call via tool use; result cached in `ai_analyses`; limit 5/day per user
-- `analyze-hand` — Claude Sonnet call via tool use; result cached in `ai_hand_analyses`; limit 20/day per user
+- `analyze-session` — Claude Sonnet call via tool use; result cached in `ai_analyses`; limit 5/day per user; 25s timeout
+- `analyze-hand` — Claude Sonnet call via tool use; result cached in `ai_hand_analyses`; limit 20/day per user; 25s timeout
 - `scrape-tournaments` — scrapes PokerNews, triggered by weekly GitHub Actions cron
+- `delete-account` — verifies JWT, deletes all user data from every table in FK order, then deletes auth user via service role key
 - Rate limits in `ai_usage_log`; `rhtk.1234@gmail.com` is exempt
 
 **Edge Function patterns:**
 - `SYSTEM_PROMPT` is a `const` string with `cache_control: { type: "ephemeral" }` — must stay static (no per-user data) for Anthropic prompt caching to work
 - Cache check → rate limit check → Claude API call (this order is critical — cache hits are free)
+- Both AI functions use `Promise.race()` with a 25s timeout to guard against Claude API hangs
 - `computeDrawSummary()` injects deterministic `[FACT —` annotations into the user prompt — do not remove; these ground the model's hand-reading
-- `buildPrompt()` tracks per-street `streetContrib` maps for accurate incremental call amounts
+- Error responses return generic user-facing messages; raw exceptions are logged server-side only
+
+### CI/CD — GitHub Actions
+
+Three active workflows in `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | Push/PR to `main` | `flutter analyze --fatal-infos` + `flutter test --coverage` |
+| `deploy-web.yml` | Push to `main` touching `lib/`, `web/`, `assets/`, `pubspec.*` | Builds web + deploys to `docs/` (preserves CNAME + .nojekyll) |
+| `build-android.yml` | Push of `v*.*.*` tag | Decodes keystore from secret, builds signed AAB, creates GitHub Release |
+| `scrape-tournaments.yml` | Weekly cron (Mon 9am UTC) | Calls `scrape-tournaments` Edge Function |
+
+Required GitHub Secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_PASSWORD`.
+
+CI generates `lib/config/supabase_config.dart` at build time from secrets — it is never committed. The `deploy-web.yml` commit uses `[skip ci]` in its message to prevent loops.
 
 ### Firebase Crashlytics
 
@@ -147,13 +173,17 @@ All models are plain immutable classes — no code generation.
 
 ### Critical patterns
 
-**Async + ref after widget disposal** — always guard `ref` usage after any `await` with `if (!context.mounted) return;`. `AppDrawer._confirmSignOut` is the canonical example.
+**Async + ref after widget disposal** — always guard `ref` usage after any `await` with `if (!mounted) return;` (use `mounted` in `State`/`ConsumerState`, not `context.mounted`). `AppDrawer._confirmSignOut` is the canonical example.
 
 **Dismissible + provider invalidation** — never call `ref.invalidate` in `onDismissed` without first removing the item from local state. Pattern: `ConsumerStatefulWidget` + `Set<String> _deletingIds`; add ID on dismiss, filter list in build, call service async. See `HandsScreen`.
 
 **Save button guard** — any form with an async save must have `bool _saving` that disables the button during the call to prevent double-submission.
 
 **fl_chart on Windows** — always set `barTouchData: BarTouchData(enabled: false)` and `lineTouchData: const LineTouchData(enabled: false)` on every chart. Default enabled state throws `RangeError` on Windows when mouse nears edge.
+
+### Analyzer configuration
+
+`analysis_options.yaml` excludes `test_imports/` (untracked scratch directory) and disables `use_null_aware_elements` (requires Dart SDK ≥3.8 collection literal syntax not yet available). `flutter analyze --fatal-infos` must return zero issues — CI enforces this.
 
 ### Web deployment — critical details
 
@@ -162,32 +192,33 @@ All models are plain immutable classes — no code generation.
 - `docs/CNAME` must contain `tablelab.app` — preserve it on every deploy
 - `docs/.nojekyll` must exist — recreate after every wipe
 - PowerShell for the flutter build command; bash for the file copy
+- `web/privacy.html` is served at `tablelab.app/privacy` — required by Apple App Store review
 
 ### Android build
 
-- `compileSdk = 36` in `android/app/build.gradle.kts`; root `build.gradle.kts` forces compileSdk 36 on library subprojects via `gradle.afterProject`
-- Release build currently uses **debug signing** (`signingConfigs.getByName("debug")`) — must be replaced with a proper release keystore before Play Store submission (see `/mobile-specialist signing`)
-- `INTERNET` permission explicitly declared in `AndroidManifest.xml` (flutter merger sometimes drops it after icon regeneration)
+- `compileSdk = 36`, `minSdk = 23` (flutter_secure_storage requires API 23+), `targetSdk = 35` (Play Store mandates ≥34) — all explicit in `android/app/build.gradle.kts`
+- Release signing reads `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` from env vars; falls back to debug signing locally when `tablelab-release.jks` is absent
+- `tablelab-release.jks` is gitignored — CI decodes it from `ANDROID_KEYSTORE_BASE64` secret
+- ProGuard enabled on release builds (`android/app/proguard-rules.pro`)
+- `INTERNET` permission explicitly declared in `AndroidManifest.xml`
 - Package ID: `com.pokertracker.poker_tracker` (tied to Google OAuth — do not rename)
-- `minSdk` should be 23 (flutter_secure_storage requires API 23+); `targetSdk` should be 35 (Play Store mandates ≥34)
 
 ### iOS build
 
-- `ios/Runner/Info.plist` `CFBundleDisplayName` is currently `"Poker Tracker"` — must be changed to `"TableLab"` before any TestFlight/App Store build
-- `flutter_launcher_icons` has `ios: false` in `pubspec.yaml` — change to `true` before the first iOS build, then run `dart run flutter_launcher_icons`
-- `ios/Runner/PrivacyInfo.xcprivacy` does not yet exist — required by Apple since May 2024; see `/mobile-specialist privacy-manifest`
+- iOS is **deprioritized** — not building until Android + Web are stable in production
+- `ios/Runner/Info.plist` `CFBundleDisplayName` = "TableLab" ✅
+- `ios/Runner/PrivacyInfo.xcprivacy` exists ✅ — must be added to Xcode Runner target before first build (right-click Runner folder in Xcode → Add Files)
+- `flutter_launcher_icons` has `ios: false` in `pubspec.yaml` — change to `true` before the first iOS build
+- `ios/ExportOptions.plist` exists for App Store export; update `teamID` before use
 - iOS builds require a macOS machine; cannot be built on Windows
 
-### Pending critical work (not yet implemented)
+### Pending work (pre-launch)
 
-These are known gaps that will cause store rejection or legal issues:
-
-| Item | Owner agent | Blocker for |
-|---|---|---|
-| Delete-account feature (GDPR right to erasure) | `/platform-engineer gdpr` | Apple App Store, GDPR |
-| Release signing config in `build.gradle.kts` | `/mobile-specialist signing` | Play Store submission |
-| `ios/Runner/Info.plist` display name fix | `/mobile-specialist ios` | All iOS builds |
-| Privacy policy at `tablelab.app/privacy` (URL) | `/legal-compliance privacy-policy` | Apple App Store |
-| `web/manifest.json` brand colors + description | `/web-engineer manifest` | Web quality |
-| `<meta name="viewport">` in `web/index.html` | `/web-engineer meta` | Mobile web usability |
-| Anthropic spend cap ($100/month hard limit) | Manual: console.anthropic.com | Cost control |
+| Item | Blocker for |
+|---|---|
+| Store screenshots (8 phone screenshots) | Play Store submission |
+| Play Console app creation + data safety form | Play Store submission |
+| Onboarding flow (3-screen first-run, needs `has_seen_onboarding` DB column) | Phase 2 gate |
+| Analytics instrumentation (provider TBD) | Phase 3 gate |
+| Supabase Pro upgrade (no daily backups on free tier) | Risk mitigation |
+| Google Play gambling policy confirmation | Production track approval |
