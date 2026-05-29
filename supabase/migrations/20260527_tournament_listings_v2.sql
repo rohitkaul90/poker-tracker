@@ -7,7 +7,7 @@ alter table tournament_listings
   drop constraint if exists tournament_listings_name_start_date_key;
 
 alter table tournament_listings
-  add constraint tournament_listings_name_start_date_key
+  add constraint if not exists tournament_listings_name_start_date_key
   unique (name, start_date);
 
 grant all privileges on table tournament_listings to service_role;
