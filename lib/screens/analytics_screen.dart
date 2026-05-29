@@ -881,7 +881,7 @@ class _PLChartState extends State<_PLChart> {
       ..sort((a, b) => b.key.compareTo(a.key));
     if (entries.isEmpty) {
       return const Center(
-          child: Text('No data', style: TextStyle(color: Colors.white38)));
+          child: Text('Not enough sessions for this view', style: TextStyle(color: Colors.white38)));
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -920,7 +920,7 @@ class _PLChartState extends State<_PLChart> {
     final years = byYear.keys.toList()..sort((a, b) => b.compareTo(a));
     if (years.isEmpty) {
       return const Center(
-          child: Text('No data', style: TextStyle(color: Colors.white38)));
+          child: Text('Not enough sessions for this view', style: TextStyle(color: Colors.white38)));
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
