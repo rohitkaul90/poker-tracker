@@ -106,7 +106,7 @@ class _MainNavigationState extends State<MainNavigation> {
           NavigationDestination(
             icon: Icon(Icons.event_outlined),
             selectedIcon: Icon(Icons.event),
-            label: 'Calendar',
+            label: 'Tournaments',
           ),
         ],
       ),

@@ -298,6 +298,7 @@ class _LogSessionScreenState extends ConsumerState<LogSessionScreen> {
       } else {
         await service.updateSession(widget.session!.id, data);
       }
+      ref.invalidate(sessionsProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {

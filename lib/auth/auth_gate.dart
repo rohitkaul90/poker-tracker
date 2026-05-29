@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/reset_password_screen.dart';
 import '../widgets/splash_screen.dart';
 
 class AuthGate extends ConsumerWidget {
@@ -28,6 +29,8 @@ class AuthGate extends ConsumerWidget {
             child = const SplashScreen(key: ValueKey('splash'));
           } else if (session == null) {
             child = const LoginScreen(key: ValueKey('login'));
+          } else if (event == AuthChangeEvent.passwordRecovery) {
+            child = const ResetPasswordScreen(key: ValueKey('reset'));
           } else {
             child = const MainNavigation(key: ValueKey('main'));
           }

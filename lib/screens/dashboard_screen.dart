@@ -10,6 +10,9 @@ import '../widgets/session_tile.dart';
 import 'log_session_screen.dart';
 import 'session_detail_screen.dart';
 import 'analytics_screen.dart';
+import 'ai_analysis/session_analysis_screen.dart';
+import '../providers/profile_provider.dart';
+import 'profile_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -247,7 +250,7 @@ class _OverviewTab extends ConsumerWidget {
 
 // ── Overview Body ─────────────────────────────────────────────────────────────
 
-class _OverviewBody extends StatelessWidget {
+class _OverviewBody extends ConsumerWidget {
   final List<SessionModel> sessions;
   final String? gameFilter;
   final String? displayCurrency;
@@ -282,7 +285,7 @@ class _OverviewBody extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final filtered = _filtered;
     final currency = _effectiveCurrency();
     final stats = _Stats.from(filtered, currency);
@@ -290,6 +293,7 @@ class _OverviewBody extends StatelessWidget {
           ..sort((a, b) => b.date.compareTo(a.date)))
         .take(5)
         .toList();
+    final profile = ref.watch(profileProvider).valueOrNull;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
@@ -343,6 +347,21 @@ class _OverviewBody extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+
+        // ── Current Bankroll card (or prompt to set it) ───────────────────
+        if (profile?.startingBankroll != null)
+          _CurrentBankrollCard(
+            startingBankroll: convertCurrency(
+              profile!.startingBankroll!,
+              profile.startingBankrollCurrency,
+              currency,
+            ),
+            totalPL: stats.totalPL,
+            currency: currency,
+          )
+        else
+          _SetBankrollPrompt(),
         const SizedBox(height: 12),
 
         // ── Stat cards grid ────────────────────────────────────────────────
@@ -427,14 +446,193 @@ class _OverviewBody extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _AiCoachingCard(session: recent.first),
         ] else
-          const Padding(
-            padding: EdgeInsets.only(top: 48),
+          Padding(
+            padding: const EdgeInsets.only(top: 48),
             child: Center(
-              child: Text('No sessions yet.\nTap + to log your first session!'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.casino_outlined,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+                  const SizedBox(height: 16),
+                  Text('No sessions yet',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Log your first session to start\ntracking your bankroll.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.6),
+                        ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const LogSessionScreen()),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Log Session'),
+                  ),
+                ],
+              ),
             ),
           ),
       ],
+    );
+  }
+}
+
+// ── Set Bankroll prompt ───────────────────────────────────────────────────────
+
+class _SetBankrollPrompt extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined,
+                  color: scheme.onSurface.withValues(alpha: 0.4), size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Set your starting bankroll to track your current balance →',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Current Bankroll card ─────────────────────────────────────────────────────
+
+class _CurrentBankrollCard extends StatelessWidget {
+  final double startingBankroll;
+  final double totalPL;
+  final String currency;
+
+  const _CurrentBankrollCard({
+    required this.startingBankroll,
+    required this.totalPL,
+    required this.currency,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final currentBankroll = startingBankroll + totalPL;
+    final isUp = currentBankroll >= startingBankroll;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          children: [
+            Text('Current Bankroll',
+                style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 8),
+            Text(
+              formatPLWithCurrency(currentBankroll, currency),
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                    color: isUp ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Started with ${formatPLWithCurrency(startingBankroll, currency)}  ·  '
+              '${totalPL >= 0 ? '+' : ''}${formatPLWithCurrency(totalPL, currency)} P&L',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── AI Coaching card ──────────────────────────────────────────────────────────
+
+class _AiCoachingCard extends StatelessWidget {
+  final SessionModel session;
+  const _AiCoachingCard({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => SessionAnalysisScreen(session: session)),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                scheme.primaryContainer.withValues(alpha: 0.6),
+                scheme.surface,
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.auto_awesome,
+                  color: scheme.primary, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Get AI coaching',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(color: scheme.primary)),
+                    const SizedBox(height: 2),
+                    Text('Analyse your latest session for leaks & insights.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurface.withValues(alpha: 0.7),
+                            )),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onSurface.withValues(alpha: 0.4)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

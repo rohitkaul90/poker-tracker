@@ -17,8 +17,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _stakesCtrl = TextEditingController();
   final _sincCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
+  final _bankrollCtrl = TextEditingController();
 
   String? _preferredGame;
+  String _bankrollCurrency = 'CAD';
   bool _loading = true;
   bool _saving = false;
   String? _uid;
@@ -37,6 +39,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _stakesCtrl.dispose();
     _sincCtrl.dispose();
     _rateCtrl.dispose();
+    _bankrollCtrl.dispose();
     super.dispose();
   }
 
@@ -52,8 +55,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       _stakesCtrl.text = profile.preferredStakes ?? '';
       _sincCtrl.text = profile.playingSince?.toString() ?? '';
       _rateCtrl.text = profile.hourlyRateGoal?.toString() ?? '';
+      _bankrollCtrl.text = profile.startingBankroll?.toString() ?? '';
       setState(() {
         _preferredGame = profile.preferredGame;
+        _bankrollCurrency = profile.startingBankrollCurrency;
         _loading = false;
       });
     } else {
@@ -77,6 +82,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         preferredStakes: _stakesCtrl.text.trim().isEmpty ? null : _stakesCtrl.text.trim(),
         playingSince: int.tryParse(_sincCtrl.text.trim()),
         hourlyRateGoal: double.tryParse(_rateCtrl.text.trim()),
+        startingBankroll: double.tryParse(_bankrollCtrl.text.trim()),
+        startingBankrollCurrency: _bankrollCurrency,
       );
       await ref.read(profileServiceProvider).upsertProfile(profile);
       ref.invalidate(profileProvider);
@@ -281,6 +288,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               icon: Icons.trending_up_outlined,
                               keyboardType: const TextInputType.numberWithOptions(
                                   decimal: true),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Bankroll ─────────────────────────────────────────────
+                    _SectionHeader('Bankroll'),
+                    const SizedBox(height: 10),
+                    Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Starting bankroll',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.outline),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _field(
+                                    controller: _bankrollCtrl,
+                                    label: 'Amount',
+                                    hint: 'e.g. 5000',
+                                    icon: Icons.account_balance_wallet_outlined,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                DropdownButton<String>(
+                                  value: _bankrollCurrency,
+                                  items: ['CAD', 'USD', 'EUR', 'GBP', 'AUD']
+                                      .map((c) => DropdownMenuItem(
+                                          value: c, child: Text(c)))
+                                      .toList(),
+                                  onChanged: (v) => setState(
+                                      () => _bankrollCurrency = v ?? 'CAD'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Used to calculate your Current Bankroll on the dashboard.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.outline),
                             ),
                           ],
                         ),

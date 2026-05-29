@@ -8,6 +8,7 @@ import '../providers/reads_provider.dart';
 import '../screens/profile_screen.dart';
 import '../screens/about_screen.dart';
 import '../screens/data_privacy_screen.dart';
+import '../screens/terms_of_service_screen.dart';
 import '../screens/help_screen.dart';
 import '../screens/equity_calculator_screen.dart';
 import '../screens/icm_calculator_screen.dart';
@@ -201,6 +202,20 @@ class AppDrawer extends ConsumerWidget {
                           context,
                           MaterialPageRoute(
                               builder: (_) => const AboutScreen()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.gavel_outlined),
+                      title: const Text('Terms of Service'),
+                      subtitle: const Text('Usage terms and conditions',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const TermsOfServiceScreen()),
                         );
                       },
                     ),

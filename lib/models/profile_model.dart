@@ -7,6 +7,8 @@ class ProfileModel {
   final String? preferredStakes;
   final int? playingSince;
   final double? hourlyRateGoal;
+  final double? startingBankroll;
+  final String startingBankrollCurrency;
 
   const ProfileModel({
     required this.id,
@@ -17,6 +19,8 @@ class ProfileModel {
     this.preferredStakes,
     this.playingSince,
     this.hourlyRateGoal,
+    this.startingBankroll,
+    this.startingBankrollCurrency = 'CAD',
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) => ProfileModel(
@@ -28,6 +32,9 @@ class ProfileModel {
         preferredStakes: json['preferred_stakes'] as String?,
         playingSince: json['playing_since'] as int?,
         hourlyRateGoal: (json['hourly_rate_goal'] as num?)?.toDouble(),
+        startingBankroll: (json['starting_bankroll'] as num?)?.toDouble(),
+        startingBankrollCurrency:
+            (json['starting_bankroll_currency'] as String?) ?? 'CAD',
       );
 
   Map<String, dynamic> toUpsert() => {
@@ -39,6 +46,8 @@ class ProfileModel {
         'preferred_stakes': preferredStakes,
         'playing_since': playingSince,
         'hourly_rate_goal': hourlyRateGoal,
+        'starting_bankroll': startingBankroll,
+        'starting_bankroll_currency': startingBankrollCurrency,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -51,6 +60,9 @@ class ProfileModel {
     String? preferredStakes,
     int? playingSince,
     double? hourlyRateGoal,
+    double? startingBankroll,
+    bool clearStartingBankroll = false,
+    String? startingBankrollCurrency,
   }) =>
       ProfileModel(
         id: id,
@@ -61,5 +73,7 @@ class ProfileModel {
         preferredStakes: preferredStakes ?? this.preferredStakes,
         playingSince: playingSince ?? this.playingSince,
         hourlyRateGoal: hourlyRateGoal ?? this.hourlyRateGoal,
+        startingBankroll: clearStartingBankroll ? null : (startingBankroll ?? this.startingBankroll),
+        startingBankrollCurrency: startingBankrollCurrency ?? this.startingBankrollCurrency,
       );
 }

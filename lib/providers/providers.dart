@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/session_model.dart';
 import '../models/session_filter.dart';
 import '../models/hand_model.dart';
@@ -13,7 +14,15 @@ final supabaseServiceProvider = Provider<SupabaseService>((ref) {
   return SupabaseService();
 });
 
+// Emits the current user's ID whenever auth state changes.
+// Providers that watch this will automatically restart on account switch.
+final authUserIdProvider = StreamProvider<String?>((ref) {
+  return Supabase.instance.client.auth.onAuthStateChange
+      .map((event) => event.session?.user.id);
+});
+
 final sessionsProvider = StreamProvider<List<SessionModel>>((ref) {
+  ref.watch(authUserIdProvider); // restart stream when user changes
   return ref.watch(supabaseServiceProvider).watchAllSessions();
 });
 
@@ -54,6 +63,7 @@ final distinctLocationsProvider = Provider<AsyncValue<List<String>>>((ref) {
 final handServiceProvider = Provider<HandService>((ref) => HandService());
 
 final handsProvider = FutureProvider<List<PokerHand>>((ref) {
+  ref.watch(authUserIdProvider); // re-fetch when user changes
   return ref.read(handServiceProvider).fetchHands();
 });
 

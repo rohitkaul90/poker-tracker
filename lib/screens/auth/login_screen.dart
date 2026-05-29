@@ -86,13 +86,15 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       );
-      ctrl.dispose();
     }
 
     if (target == null || target.isEmpty || !target.contains('@')) return;
     setState(() => _resetLoading = true);
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(target);
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        target,
+        redirectTo: 'https://tablelab.app',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Reset link sent to $target')),

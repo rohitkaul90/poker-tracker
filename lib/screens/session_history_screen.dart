@@ -59,10 +59,60 @@ class SessionHistoryScreen extends ConsumerWidget {
         data: (sessions) {
           if (sessions.isEmpty) {
             return Center(
-              child: Text(
-                hasFilter
-                    ? 'No sessions match your filters.'
-                    : 'No sessions yet.',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      hasFilter ? Icons.filter_list_off : Icons.casino_outlined,
+                      size: 64,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      hasFilter
+                          ? 'No sessions match your filters'
+                          : 'No sessions yet',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      hasFilter
+                          ? 'Try adjusting or clearing your filters.'
+                          : 'Log your first session to start\ntracking your bankroll.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
+                          ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (hasFilter)
+                      OutlinedButton.icon(
+                        onPressed: () => ref
+                            .read(filterProvider.notifier)
+                            .state = const SessionFilter(),
+                        icon: const Icon(Icons.clear),
+                        label: const Text('Clear Filters'),
+                      )
+                    else
+                      FilledButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const LogSessionScreen()),
+                        ),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Log Session'),
+                      ),
+                  ],
+                ),
               ),
             );
           }
