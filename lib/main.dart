@@ -11,7 +11,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/hands_screen.dart';
 import 'screens/reads_screen.dart';
 import 'screens/session_history_screen.dart';
-import 'screens/tournament_calendar_screen.dart';
+import 'screens/tools_screen.dart';
 import 'widgets/app_drawer.dart';
 
 void main() async {
@@ -76,7 +76,7 @@ class _MainNavigationState extends State<MainNavigation> {
           SessionHistoryScreen(),
           HandsScreen(),
           ReadsScreen(),
-          TournamentCalendarScreen(),
+          ToolsScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -104,9 +104,9 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Reads',
           ),
           NavigationDestination(
-            icon: Icon(Icons.event_outlined),
-            selectedIcon: Icon(Icons.event),
-            label: 'Tournaments',
+            icon: Icon(Icons.construction_outlined),
+            selectedIcon: Icon(Icons.construction),
+            label: 'Tools',
           ),
         ],
       ),

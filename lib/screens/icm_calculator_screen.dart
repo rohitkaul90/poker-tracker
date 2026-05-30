@@ -24,7 +24,8 @@ class _ThousandsFormatter extends TextInputFormatter {
 }
 
 class IcmCalculatorScreen extends StatefulWidget {
-  const IcmCalculatorScreen({super.key});
+  final bool showScaffold;
+  const IcmCalculatorScreen({super.key, this.showScaffold = true});
 
   @override
   State<IcmCalculatorScreen> createState() => _IcmCalculatorScreenState();
@@ -261,21 +262,8 @@ class _IcmCalculatorScreenState extends State<IcmCalculatorScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(
-        title: const Text('ICM Deal Calculator'),
-        actions: [
-          if (_results != null)
-            IconButton(
-              icon: const Icon(Icons.share_outlined),
-              tooltip: 'Share deal',
-              onPressed: _shareResults,
-            ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
+    final body = SafeArea(
+      top: false,
         child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -364,7 +352,23 @@ class _IcmCalculatorScreenState extends State<IcmCalculatorScreen> {
           ],
         ],
       ),
-        ),
+      );
+
+    if (!widget.showScaffold) return body;
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text('ICM Deal Calculator'),
+        actions: [
+          if (_results != null)
+            IconButton(
+              icon: const Icon(Icons.share_outlined),
+              tooltip: 'Share deal',
+              onPressed: _shareResults,
+            ),
+        ],
+      ),
+      body: body,
     );
   }
 

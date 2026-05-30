@@ -43,7 +43,8 @@ class _PlayerState {
 }
 
 class EquityCalculatorScreen extends StatefulWidget {
-  const EquityCalculatorScreen({super.key});
+  final bool showScaffold;
+  const EquityCalculatorScreen({super.key, this.showScaffold = true});
 
   @override
   State<EquityCalculatorScreen> createState() => _EquityCalculatorScreenState();
@@ -216,17 +217,9 @@ class _EquityCalculatorScreenState extends State<EquityCalculatorScreen> {
       letterSpacing: 1, color: theme.colorScheme.primary,
     );
 
-    return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(
-        title: const Text('Equity Calculator'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), tooltip: 'Reset', onPressed: _reset),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    final body = SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Players ─────────────────────────────────────────────────
@@ -388,7 +381,18 @@ class _EquityCalculatorScreenState extends State<EquityCalculatorScreen> {
             const SizedBox(height: 40),
           ],
         ),
+    );
+
+    if (!widget.showScaffold) return body;
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text('Equity Calculator'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), tooltip: 'Reset', onPressed: _reset),
+        ],
       ),
+      body: body,
     );
   }
 

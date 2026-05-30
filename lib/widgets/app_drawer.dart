@@ -11,8 +11,7 @@ import '../screens/data_privacy_screen.dart';
 import '../screens/terms_of_service_screen.dart';
 import '../screens/help_screen.dart';
 import '../screens/settings_screen.dart';
-import '../screens/equity_calculator_screen.dart';
-import '../screens/icm_calculator_screen.dart';
+import '../screens/tournament_calendar_screen.dart';
 
 // Key for the root nav scaffold so any tab screen can open the drawer.
 final mainScaffoldKey = GlobalKey<ScaffoldState>();
@@ -143,41 +142,22 @@ class AppDrawer extends ConsumerWidget {
 
                     const Divider(height: 1),
 
-                    // ── Tools section ────────────────────────────────────
-                    _SectionLabel('TOOLS', theme),
-                    ListTile(
-                      leading: const Icon(Icons.percent),
-                      title: const Text('Equity Calculator'),
-                      subtitle: const Text('Hand vs range equity',
-                          style: TextStyle(fontSize: 11)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const EquityCalculatorScreen()),
-                        );
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.calculate_outlined),
-                      title: const Text('ICM Deal Calculator'),
-                      subtitle: const Text('Fair chip-chop deals at final tables',
-                          style: TextStyle(fontSize: 11)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const IcmCalculatorScreen()),
-                        );
-                      },
-                    ),
-
-                    const Divider(height: 1),
-
                     // ── App section ──────────────────────────────────────
                     _SectionLabel('APP', theme),
+                    ListTile(
+                      leading: const Icon(Icons.event_outlined),
+                      title: const Text('Tournament Calendar'),
+                      subtitle: const Text('Upcoming live tournaments',
+                          style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const TournamentCalendarScreen()),
+                        );
+                      },
+                    ),
                     ListTile(
                       leading: const Icon(Icons.settings_outlined),
                       title: const Text('Settings'),
