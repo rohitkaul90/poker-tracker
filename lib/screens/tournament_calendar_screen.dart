@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/tournament_listing.dart';
 import '../providers/providers.dart';
-import '../widgets/app_drawer.dart';
-
 class TournamentCalendarScreen extends ConsumerStatefulWidget {
   const TournamentCalendarScreen({super.key});
 
@@ -41,10 +39,6 @@ class _TournamentCalendarScreenState
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
-        ),
         title: const Text('Tournaments'),
         actions: [
           listAsync.maybeWhen(

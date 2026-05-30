@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'equity_calculator_screen.dart';
 import 'icm_calculator_screen.dart';
+import '../widgets/app_drawer.dart';
 
 class ToolsScreen extends StatefulWidget {
   const ToolsScreen({super.key});
@@ -16,7 +17,13 @@ class _ToolsScreenState extends State<ToolsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Tools')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text('Tools'),
+      ),
       body: Column(
         children: [
           Padding(
