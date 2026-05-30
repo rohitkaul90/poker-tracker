@@ -632,7 +632,7 @@ serve(async (req: Request) => {
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("CLAUDE_TIMEOUT")), 25000),
+      setTimeout(() => reject(new Error("CLAUDE_TIMEOUT")), 50000),
     );
 
     const message = await Promise.race([claudeCall, timeoutPromise]);
