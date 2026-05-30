@@ -21,7 +21,7 @@ android {
         applicationId = "com.pokertracker.poker_tracker"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23 // flutter_secure_storage requires API 23+
+        minSdk = maxOf(flutter.minSdkVersion, 23) // flutter_secure_storage requires API 23+
         targetSdk = 35 // Play Store requires targetSdk >= 34; explicit to avoid Flutter default drift
         versionCode = flutter.versionCode
         versionName = flutter.versionName
