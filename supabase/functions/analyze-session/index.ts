@@ -464,7 +464,7 @@ function buildUserPrompt(
     }
   }
 
-  const cap = Math.min(hands.length, 6);
+  const cap = Math.min(hands.length, 3);
   if (cap > 0) {
     lines.push("", `RECORDED HANDS (${cap} of ${hands.length}):`);
     for (let i = 0; i < cap; i++) {
@@ -632,7 +632,7 @@ serve(async (req: Request) => {
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("CLAUDE_TIMEOUT")), 50000),
+      setTimeout(() => reject(new Error("CLAUDE_TIMEOUT")), 120000),
     );
 
     const message = await Promise.race([claudeCall, timeoutPromise]);
